@@ -18,6 +18,9 @@ function draw() {
     text("WASD to change ball1 speed -- ", 5, 540);
     text("X to remove ball, Mouse click to add ball, Space to slow balls", 5, 570);
     text("G to activate Gravity " + G, 5, 590);
+    // push();
+    // // text("Kinetic energy ball1  "+ balls[0].getKineticEnergy(), 5, 500);
+    // pop();
     // text(balls[0].vy, 5, 580);
     // //////////
 
