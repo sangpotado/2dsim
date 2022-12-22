@@ -64,6 +64,11 @@ class Particle {
 
     }
 
+    getKineticEnergy() {
+      let e = 0.5*this.mass * Math.sqrt(this.vx**2 + this.vy**2);
+      return e
+    }
+
     bounce(other_ball) {
         // momentum formula
         if ((Math.abs(this.x - other_ball.x) <= this.r && (Math.abs(this.y - other_ball.y) <= this.r) || (Math.abs(this.x - other_ball.x) <= other_ball.r/2 && (Math.abs(this.y - other_ball.y) <= other_ball.r/2) ))) {
