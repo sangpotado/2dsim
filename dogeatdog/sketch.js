@@ -24,6 +24,7 @@ function draw() {
             };
         people.forEach(function(p) {
             if (!Object.is(person, p)) {
+                person.detect(p);
                 person.eat(p);
                 update(people);
             }

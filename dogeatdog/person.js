@@ -1,7 +1,7 @@
 class Person {
     constructor() {
-      this.x = 0; // add x property
-      this.y = 0; // add y property
+      this.x = 0; 
+      this.y = 0; 
       this.v = {x: 0, y: 0};
       this.a = {x: 0, y: 0};
       this.m = 1;
@@ -19,7 +19,7 @@ class Person {
     getKineticEnergy() {
           const v = Math.sqrt(this.v.x * this.v.x + this.v.y * this.v.y);
     
-          return 0.5 * m * v * v;
+          return 0.5 * this.m * v * v;
     }
 
     move() {
@@ -43,8 +43,6 @@ class Person {
         const velocityAngle = Math.atan2(this.v.y, this.v.x);
         this.a.x = force.x / this.m * Math.cos(velocityAngle);
         this.a.y = force.y / this.m * Math.sin(velocityAngle);
-        this.v.x += this.a.x;
-        this.v.y += this.a.y;
         const newAcceleration = Math.sqrt(this.a.x * this.a.x + this.a.y * this.a.y);
         var distanceTraveled = 0;
         if (prevAcceleration < newAcceleration) {
@@ -60,6 +58,7 @@ class Person {
       if (distance <= this.m && this.m > other.m) {
         this.m += other.m;
         other.status = "dead";
+        console.log(`${this.id} eat ${other.id}`);
         }
       }
 
@@ -75,17 +74,53 @@ class Person {
     vision() {
 
       const velocityAngle = Math.atan2(this.v.y, this.v.x);
-      let dX = 5* this.m * Math.cos(velocityAngle);
-      let dY = 5* this.m * Math.sin(velocityAngle);
+      // const inverseAngle = 2*Math.PI - velocityAngle;
+      let dX = 10* this.m * Math.cos(velocityAngle);
+      let dY = 10* this.m * Math.sin(velocityAngle);
 
-      // let visX = dX/Math.cos(velocityAngle*0.4);
-      // let visY = dY/Math.sin(velocityAngle*0.4);
-      // const visX = this.v.x/ Math.abs(this.v.x)*this.m*2;
-      // const visY = this.v.y/ Math.abs(this.v.y)*this.m*2;
+      let visX = dX*0.76 - dY*0.6496;
+      let visY = dX*0.6496 + dY*0.7603;
 
-      return [this.x + dX, this.y + dY];
+      let visX2 = dX*0.76 + dY*0.6496;
+      let visY2 = -dX*0.6496 + dY*0.76;
+
+      return [this.x + visX, this.y + visY,this.x + visX2, this.y + visY2, this.x + dX, this.y+dY];
     }
+
+    gravity(p) {
+      // let d = this.getDistance(p);
+      // let F = 75*(this.m* p.m)/(d*d);
+      let dx = p.x - this.x;
+      let dy = p.y - this.y;
+      let fx = Math.cos(Math.atan2(dy,dx));
+      let fy = Math.sin(Math.atan2(dy,dx));
+      if (this.m > p.m) {
+        this.a.x += fx/this.m;
+        this.a.y += fy/this.m;
+        console.log(`${this.id} chasings ${p.id}, a ${this.a.x}`)
+      }
+      else if (this.m <= p.m) {
+        this.v.x -= fx;
+        this.v.y -= fy;
+        console.log(`${this.id} run away ${p.id}, a ${this.a.x}`)
+      }
+      // else {this.applyForce({x:fx, y:fy});}
+      // p.applyForce({x:-fx, y:-fy});
+   }
+
+    detect(other) {
+      var zoneX = [this.vision()[0],this.vision()[2],this.vision()[4]];
+      var zoneY = [this.vision()[1],this.vision()[3],this.vision()[5]];
+      if (other.x < Math.max(...zoneX) && other.x > Math.min(...zoneX) && other.y > Math.min(...zoneY) && other.y < Math.max(...zoneY))  {
+            this.gravity(other);
+          // console.log(`${this.id} detect ${other.id}`)
+      }
+      // else 
+    }
+
     update() {
+        let kE = this.getKineticEnergy();
+        this.m -= 0.0001*kE/ Math.sqrt(this.v.x**2 + this.v.y**2);
         if (this.m > this.o_m) {
           this.status = "happy"
         }
@@ -94,12 +129,15 @@ class Person {
         }
         else if (this.m < 1) {
           this.status = "dead"
-        }
-        if (this.status === "happy") {
-          const acceleration = Math.sqrt(this.a.x * this.a.x + this.a.y * this.a.y);
+        };
+
+        if (this.status == "happy") {
+          const acceleration = Math.sqrt(this.a.x **2 + this.a.y **2);
           if (acceleration > 0) {
             this.a.x *= 0.9;
             this.a.y *= 0.9;
+            this.v.x *= 0.999;
+            this.v.y *= 0.999;
           }
         }
 

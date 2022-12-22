@@ -10,7 +10,7 @@ for (let i = 0; i < 10; i++) {
   person.v.y = Math.random()+ 0.5; // random y velocity between 0.5 and 1
   person.a.x = 0;
   person.a.y = 0;
-  person.m = Math.random() *30;
+  person.m = Math.random() *100;
   person.o_m = person.m;
   person.status = "hungry";
   person.id = i;
@@ -38,9 +38,10 @@ function drawPerson(p) {
     ellipse(p.x,p.y,p.m);
     // ellipse(p.vision()[0], p.vision()[1],p.m)
     stroke(126);
-    strokeWeight(5) 
+    strokeWeight(3) 
     line(p.x,p.y, p.vision()[0], p.vision()[1]);
-    // line(p.x,p.y, p.x, p.vision()[1]);
+    line(p.x,p.y, p.vision()[2], p.vision()[3]);
+    line(p.x,p.y, p.vision()[4], p.vision()[5]);
     fill(255);
     textSize(this.m*2);
     text(`${p.id}`, p.x, p.y)
