@@ -50,7 +50,7 @@ class Particle {
     
     gravity(p) {
         let d = this.distanceTo(p);
-        let F = 75*(this.mass* p.mass)/(d*d);
+        let F = 50*(this.mass* p.mass)/(d*d);
         let dx = p.x - this.x;
         let dy = p.y - this.y;
         let fx = F* Math.cos(Math.atan2(dy,dx));
@@ -59,8 +59,11 @@ class Particle {
             this.applyForce({x:-fx,y:-fy});
             p.applyForce({x:fx, y:fy});
         }
-        else {this.applyForce({x:fx, y:fy});}
-        p.applyForce({x:-fx, y:-fy});
+        else {
+          this.applyForce({x:fx, y:fy});
+          p.applyForce({x:-fx, y:-fy})
+      }
+        ;
 
     }
 
@@ -82,8 +85,7 @@ class Particle {
             let temp_y = this.vy;
             this.vy = ((this.mass - other_ball.mass)/(this.mass + other_ball.mass)*this.vy + (2*other_ball.mass)/(this.mass+ other_ball.mass)*  other_ball.vy );
             other_ball.vy = ((other_ball.mass - this.mass)/(this.mass + other_ball.mass)*other_ball.vy + (2*this.mass)/(this.mass+ other_ball.mass)*temp_y );
-            // other_ball.count += 1;
-            // this.color = (Math.random()*255,Math.random()*255,Math.random()*255);
+
             // this.vy += this.g;
         }
     }
@@ -106,8 +108,14 @@ class Wall {
 
 var screen1 = {x: 1024, y:517};
 var balls = [];
+var makeArt = false
 
 function drawBall(b) {
+    if (makeArt) {fill(random()*255, random()*255, random()*255, random()*100)}
+    else {
+      fill(0,0,0);
+    }
+
     noStroke();
     ellipse(b.x, b.y, b.r);
 }
