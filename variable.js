@@ -6,15 +6,16 @@ class ball {
       this.vx = vx;
       this.vy = vy;
       this.mass = this.r/10;
-      this.color = (20,220,100);
+      this.color = [20,220,100];
       this.count = 0;
-      this.g = 0.5;
+      this.g = 0.1;
     }
 
     move() {
         this.x += this.vx;
         this.y += this.vy;
-        this.vy += this.g;
+        if (!makeArt) {this.vy += this.g;}
+        
     }
     bounce(other_ball) {
         // momentum formula
@@ -30,7 +31,7 @@ class ball {
             this.vy = (this.mass - other_ball.mass)/(this.mass + other_ball.mass)*this.vy + (2*other_ball.mass)/(this.mass+ other_ball.mass)*  other_ball.vy ;
             other_ball.vy = (other_ball.mass - this.mass)/(this.mass + other_ball.mass)*other_ball.vy + (2*this.mass)/(this.mass+ other_ball.mass)*temp_y;
             other_ball.count += 1;
-            this.color = (Math.random()*255,Math.random()*255,Math.random()*255);
+            this.color = [random()*255,random()*255,random()*255];
             // this.vy += this.g;
         }
     }
@@ -72,10 +73,16 @@ class ball {
 //     return Balls
 // }
 var balls = [];
+var makeArt = false;
+var run = true;
+
 
 let drawBall = function(b) {
     noStroke;
-    fill(b.color);
+    if (makeArt) {
+        fill(b.color[0],b.color[1],b.color[2], random()*100);
+    }
+    else {    fill(255);}
     ellipse(b.x, b.y, b.r);
 }
 
