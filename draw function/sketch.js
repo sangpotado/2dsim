@@ -13,13 +13,12 @@ function draw() {
 
     drawMouse(width,height, 20)
 
-    // drawTangent(fP, width, height, 20);
+    drawTangent(P, width, height, 20);
 
     drawPoints(P.Screenpoints, [250,40,150]);
-
     if (Dlayer1) { 
         layer1.forward(X);
-        // layer1.sigmoid();
+        layer1.sigmoid();
 
         // layer2.forward(layer1.output);
 
@@ -43,9 +42,9 @@ function draw() {
         P.rotate(0.1);
 
     }
-    if (keyIsDown(76)) { /// key L
+    if (keyIsDown(76)) { /// key L, learn manually
         layer1.forward(X);
-        // layer1.sigmoid();
+        layer1.sigmoid();
 
         // layer2.forward(layer1.output);
 
@@ -63,7 +62,7 @@ function draw() {
 }
 
 function keyPressed() {
-    if (keyCode == 65) {    //key A
+    if (keyCode == 65) {    //key A, create neural network with 2 layers and generate X and Y data
         layer1 = new Layer(P.Actualpoints.length,P.Actualpoints.length);
         layer2 = new Layer(P.Actualpoints.length,P.Actualpoints.length);
         X = getXValues(P.Actualpoints);

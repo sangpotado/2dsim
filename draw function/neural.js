@@ -60,7 +60,7 @@ class Layer {
         let temploss = [];
         this.TotalLoss = 0;
         for (let i=0; i<this.output.length; i++) {
-            let loss = (this.output[i] - Y[i])**2;
+            let loss = 0.5*(this.output[i] - Y[i])**2;
             temploss.push(loss);
             this.TotalLoss += loss;
         }
@@ -70,8 +70,8 @@ class Layer {
     }
 
     learn(rate,X) {
-        let result = this.weights.map(neuron => neuron.map((w,i) => w -rate* this.losses[i]/this.TotalLoss));
-        // let resultBias = this.bias.map((b, i) => b - rate*this.losses[i]/this.aaTotalLoss*b);
+        let result = this.weights.map(neuron => neuron.map((w,i) => w -rate* (this.output[i] - Y[i])/this.TotalLoss));
+        // let resultBias = this.bias.map((b, i) => b - rate*this.losses[i]/this.TotalLoss*b);
         this.weights = result;
         // this.bias = resultBias;
         this.gen += 1;
