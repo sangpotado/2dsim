@@ -17,21 +17,17 @@ function draw() {
 
     drawPoints(P.Screenpoints, [250,40,150]);
     if (Dlayer1) { 
-        layer1.forward(X);
-        layer1.sigmoid();
+        l1.forward(x);
+        l2.forward(l1.activated_z);
+        l2.backprop_last(l1.activated_z, y)
+        l1.backprop(l2);
+        l1.learn(0.1);
+        l2.learn(0.1);
 
-        // layer2.forward(layer1.output);
-
-        // layer2.CalculateLoss(Y);
-        // layer2.learn(0.1,X);
-
-        layer1.CalculateLoss(Y);
-        layer1.learn(0.05,X);
-
-        layer1.generatePoints(X);
-        drawPoints(layer1.Screenpoints, [100,20,250]);
+        l2.generatePoints(x);
+        // console.log('wtf');
+        drawPoints(l2.Screenpoints, [100,20,250]);
         drawInfo();
-        // if (layer1.TotalLoss <= 0.01 ) {Dlayer1 = false};
     }
 
     // drawLearn(fP.learnP.x,fP.learnP.y);
@@ -43,33 +39,27 @@ function draw() {
 
     }
     if (keyIsDown(76)) { /// key L, learn manually
-        layer1.forward(X);
-        layer1.sigmoid();
+        l1.forward(x);
+        l2.forward(l1.activated_z);
+        l2.backprop_last(l1.activated_z, y)
+        l1.backprop(l2);
+        l1.learn(0.1);
+        l2.learn(0.1);
 
-        // layer2.forward(layer1.output);
-
-        // layer2.CalculateLoss(Y);
-        // layer2.learn(0.1,X);
-
-        layer1.CalculateLoss(Y);
-        layer1.learn(0.05,X);
-
-        layer1.generatePoints(X);
-        drawPoints(layer1.Screenpoints, [100,20,250]);
+        l2.generatePoints(x);
+        // console.log('wtf');
+        drawPoints(l2.Screenpoints, [100,20,250]);
         drawInfo();
-        // if (layer1.TotalLoss <= 0.01) {Dlayer1 = false};
     }
 }
 
 function keyPressed() {
     if (keyCode == 65) {    //key A, create neural network with 2 layers and generate X and Y data
-        layer1 = new Layer(P.Actualpoints.length,P.Actualpoints.length);
-        layer2 = new Layer(P.Actualpoints.length,P.Actualpoints.length);
-        X = getXValues(P.Actualpoints);
-        Y = getYValues(P.Actualpoints);
-        layer1.forward(X);
-
-        // layer2 = new Layer(P.Actualpoints.length,P.Actualpoints.length);
+        l1 = new Layer(P.Actualpoints.length,100);
+        l2 = new Layer(100,P.Actualpoints.length);
+        x = getXValues(P.Actualpoints);
+        y = getYValues(P.Actualpoints);
+   
         console.log("layer1 and 2 created, collected X and Y")
     }
     if (keyCode == 68) {    //key D
@@ -82,7 +72,6 @@ function keyPressed() {
 //         balls[0].vy += -10;
 //     }
     if (keyCode == 83) {     //key S
-        layer1.generatePoints(X);
         Dlayer1 = true;
     }
 //     if (keyCode == 32) {
@@ -99,19 +88,16 @@ function keyPressed() {
 //         else {makeArt = true}
 //     }
     if (keyCode == 76) {   //key L
-        layer1.forward(X);
-        // layer1.ReLu();
+        l1.forward(x);
+        l2.forward(l1.activated_z);
+        l2.backprop_last(l1.activated_z, y)
+        l1.backprop(l2);
+        l1.learn(0.1);
+        l2.learn(0.1);
 
-        // layer2.forward(layer1.output);
-
-        layer1.CalculateLoss(Y);
-        layer1.learn(0.001,X);
-
-       
-        // layer2.CalculateLoss(Y);
-        // layer2.learn(0.01,X);
-
-        layer1.generatePoints(X);
+        l2.generatePoints(x);
+        drawPoints(l2.Screenpoints, [100,20,250]);
+        drawInfo();
     }
     if (keyCode == 67) {   //key C
         fP.rotate(0.5);

@@ -110,6 +110,12 @@ var drawMouse = function(w, h,u) {
 }
 
 
+function getXValues(points) {
+    return points.map(point => point.x);
+}
+function getYValues(points) {
+    return points.map(point => point.y);
+}
 
 class Points {
     constructor() {
@@ -145,18 +151,18 @@ class Points {
         }
     }
 
-    learn(rate) {
-        let i = findIndex(this.learnX,this.Actualpoints);
+    // learn(rate) {
+    //     let i = findIndex(this.learnX,this.Actualpoints);
 
-        let s = findSlope(this.Actualpoints[i].x, this.Actualpoints[i].y, this.Actualpoints[i+1].x, this.Actualpoints[i+1].y);
+    //     let s = findSlope(this.Actualpoints[i].x, this.Actualpoints[i].y, this.Actualpoints[i+1].x, this.Actualpoints[i+1].y);
 
-        this.learnX -= s.m*rate;
-        console.log(this.learnX);
+    //     this.learnX -= s.m*rate;
+    //     console.log(this.learnX);
     
-        this.learnP = this.Screenpoints[i];
+    //     this.learnP = this.Screenpoints[i];
 
-        // console.log(i, this.learnP);
-    }
+    //     // console.log(i, this.learnP);
+    // }
 
     // add points with mouse
     addPoints() {
@@ -171,7 +177,7 @@ class Points {
 function drawInfo() {
     push();
     fill(50,240,80);
-    text(`generation: ${layer1.gen}  // loss: ${layer1.TotalLoss.toFixed(3)}`, 5, 450);
+    text(`generation: ${l2.gen}  // loss: `, 5, 450);
 }
 
 var P = new Points;
