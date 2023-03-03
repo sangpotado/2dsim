@@ -60,6 +60,7 @@ class Layer {
         this.Actualpoints = tempActual;
         this.Screenpoints = tempScreen;
     }
+
 }
 // Relu
 function relu(z) {
@@ -67,7 +68,7 @@ function relu(z) {
     return relu;
 }
 function relu_prime(z) {
-    let a_d = z.map(y => {if (y>0) {return 1;} else {return 0}}); //relu derivative
+    let a_d = z.map(y => {if (y>0.01) {return 1;} else {return 0}}); //relu derivative
     return a_d
 }
 
@@ -85,8 +86,8 @@ var l1;
 var l2;
 var x;
 var y;
-var Dlayer1 = false;
-
+var DRAW = false;
+var TRAIN = false;
 //testing
 // let l1 = new Layer(3,2, "first");
 // let l2 = new Layer(2,3, "last");

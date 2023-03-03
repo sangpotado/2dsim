@@ -177,7 +177,13 @@ class Points {
 function drawInfo() {
     push();
     fill(50,240,80);
-    text(`generation: ${l2.gen}  // loss: `, 5, 450);
+    let loss = 0;
+    try {
+        loss = math.sum(math.map(math.subtract(l2.activated_z, y), math.square));
+        if (loss<0.0001) {TRAIN=false;}
+    } catch(error) {loss = 0};
+
+    text(`generation: ${l2.gen}  // loss: ${loss}`, 5, 450);
 }
 
 var P = new Points;

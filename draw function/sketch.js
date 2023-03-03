@@ -16,7 +16,9 @@ function draw() {
     drawTangent(P, width, height, 20);
 
     drawPoints(P.Screenpoints, [250,40,150]);
-    if (Dlayer1) { 
+
+
+    if (TRAIN) { 
         l1.forward(x);
         l2.forward(l1.activated_z);
         l2.backprop_last(l1.activated_z, y)
@@ -25,7 +27,8 @@ function draw() {
         l2.learn(0.1);
 
         l2.generatePoints(x);
-        // console.log('wtf');
+    }
+    if (DRAW) {
         drawPoints(l2.Screenpoints, [100,20,250]);
         drawInfo();
     }
@@ -47,9 +50,6 @@ function draw() {
         l2.learn(0.1);
 
         l2.generatePoints(x);
-        // console.log('wtf');
-        drawPoints(l2.Screenpoints, [100,20,250]);
-        drawInfo();
     }
 }
 
@@ -63,16 +63,18 @@ function keyPressed() {
         console.log("layer1 and 2 created, collected X and Y")
     }
     if (keyCode == 68) {    //key D
-        layer1.forward(X);
-        console.log(layer1.output[1]);
-        // layer1.ReLu();
-        // layer2.forward(layer1.output);
+        // layer1.forward(X);
+        // console.log(layer1.output[1]);
+        // // layer1.ReLu();
+        // // layer2.forward(layer1.output);
+        if (TRAIN) {TRAIN=false;}
     }
 //     if (keyCode == 87) {
 //         balls[0].vy += -10;
 //     }
     if (keyCode == 83) {     //key S
-        Dlayer1 = true;
+        TRAIN = true;
+        DRAW = true;
     }
 //     if (keyCode == 32) {
 
@@ -96,8 +98,8 @@ function keyPressed() {
         l2.learn(0.1);
 
         l2.generatePoints(x);
-        drawPoints(l2.Screenpoints, [100,20,250]);
-        drawInfo();
+        DRAW = true;
+
     }
     if (keyCode == 67) {   //key C
         fP.rotate(0.5);
