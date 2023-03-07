@@ -20,7 +20,7 @@ class Layer {
     }
 
     //calculate delta_w and delta_b, the gradient of each weight and bias
-    backprop_last(x,y) {  //previous layer and next layer
+    backprop_last(y) {  //previous layer and next layer
         //feed forward, calculate z and activated_z
         // this.forward(x);
 
@@ -33,7 +33,9 @@ class Layer {
         this.dW = math.dotMultiply(this.weights, this.grad);
     }
     backprop(next) {
-        let grad_w = math.multiply(math.transpose(this.weights), next.grad);
+        // let grad_w = math.multiply(math.transpose(this.weights), next.grad);
+        let grad_w = math.multiply(next.grad, this.weights);
+
         // this.grad = math.dotMultiply(grad_w, sigmoid_prime(this.z));
         this.grad = math.dotMultiply(grad_w, relu_prime(this.z));
         this.dB = this.grad;
@@ -52,7 +54,7 @@ class Layer {
         let tempScreen = [];
         for (let i =0; i< this.activated_z._data.length; i++) {
             let xx = x[i];
-            let yy = this.activated_z._data[i];
+            let yy = this.z._data[i];
             // console.log(this.activated_z['_data'][i]);
             tempActual.push({x: xx, y: yy})
             tempScreen.push(convertActualToScreen(xx,yy,1024,512,20));

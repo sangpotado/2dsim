@@ -19,17 +19,11 @@ function draw() {
 
 
     if (TRAIN) { 
-        l1.forward(x);
-        l2.forward(l1.activated_z);
-        l2.backprop_last(l1.activated_z, y)
-        l1.backprop(l2);
-        l1.learn(0.1);
-        l2.learn(0.1);
-
-        l2.generatePoints(x);
+        train()
     }
     if (DRAW) {
         drawPoints(l2.Screenpoints, [100,20,250]);
+        drawPoints(l1.Screenpoints, [255,0,0]);
         drawInfo();
     }
 
@@ -42,14 +36,7 @@ function draw() {
 
     }
     if (keyIsDown(76)) { /// key L, learn manually
-        l1.forward(x);
-        l2.forward(l1.activated_z);
-        l2.backprop_last(l1.activated_z, y)
-        l1.backprop(l2);
-        l1.learn(0.1);
-        l2.learn(0.1);
-
-        l2.generatePoints(x);
+        train()
     }
 }
 
@@ -63,14 +50,10 @@ function keyPressed() {
         console.log("layer1 and 2 created, collected X and Y")
     }
     if (keyCode == 68) {    //key D
-        // layer1.forward(X);
-        // console.log(layer1.output[1]);
-        // // layer1.ReLu();
-        // // layer2.forward(layer1.output);
         if (TRAIN) {TRAIN=false;}
     }
 //     if (keyCode == 87) {
-//         balls[0].vy += -10;
+
 //     }
     if (keyCode == 83) {     //key S
         TRAIN = true;
@@ -80,24 +63,16 @@ function keyPressed() {
 
 //     }
 //     if (keyCode == 67) {
-//         console.log(balls[0].count);
+//
 //     }
 //     if (keyCode == 88) {
-//         balls.pop();
+//
 //     }
 //     if (keyCode == 90) {
-//         if (makeArt) {makeArt = false}
-//         else {makeArt = true}
+
 //     }
     if (keyCode == 76) {   //key L
-        l1.forward(x);
-        l2.forward(l1.activated_z);
-        l2.backprop_last(l1.activated_z, y)
-        l1.backprop(l2);
-        l1.learn(0.1);
-        l2.learn(0.1);
 
-        l2.generatePoints(x);
         DRAW = true;
 
     }
@@ -113,4 +88,15 @@ function mousePressed() {
 }    
 function mouseDragged() {
     P.addPoints();
+}
+function train() {
+    l1.forward(x);
+    l2.forward(l1.activated_z);
+    l2.backprop_last(y);
+    l1.backprop(l2);
+    l1.learn(0.1);
+    l2.learn(0.1);
+
+    l2.generatePoints(x);
+    l1.generatePoints(x);
 }
