@@ -8,7 +8,10 @@ function setup() {
 }
 
 function draw() {
-    background(100, 200, 50);
+    if (!makeArt) {
+        background(100, 200, 50)
+    }
+
     noStroke();
     text(`${balls.length}`, 70, 70);
 
@@ -17,7 +20,12 @@ function draw() {
     fill(0);
     text("WASD to change ball1 speed -- ", 5, 540);
     text("X to remove ball, Mouse click to add ball, Space to slow balls", 5, 570);
-    text("G to activate Gravity " + G, 5, 590);
+    text("G to activate Gravity " + G + " , Z for eye candy", 5, 590);
+
+    
+    // push();
+    // // text("Kinetic energy ball1  "+ balls[0].getKineticEnergy(), 5, 500);
+    // pop();
     // text(balls[0].vy, 5, 580);
     // //////////
 
@@ -81,6 +89,10 @@ function keyPressed() {
         if (G==true) {G=false}
         else {G=true}
     
+    }
+    if (keyCode == 90)  {
+        if (makeArt) {makeArt=false}
+        else {makeArt=true}
     }
     console.log("keyPressed: " + keyCode)
 }
