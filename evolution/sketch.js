@@ -12,4 +12,11 @@ function draw() {
     if (!P.alive && P.fitness > 5) { // 
         P.reset();
     }
+    
+    
+    textSize(20);
+    fill(0, 102, 153);
+    text(`fitness: ${P.fitness}`, 10, 450);
+    text(`gen:${P.generation}`, 10,475);
+
 }

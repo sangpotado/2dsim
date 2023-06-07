@@ -74,6 +74,7 @@ class Population {
         this.alive = true;
         this.fitness = seed.fitness;
         this.obstacles = obs;
+        this.generation = 0;
     }
 
     drawPopulation() {
@@ -128,5 +129,6 @@ class Population {
         }
 
         this.alive = true;
+        this.generation += 1;
     }
 }
