@@ -1,26 +1,30 @@
 class Person {
-    constructor() {
-      this.x = 0; 
-      this.y = 0; 
-      this.v = {x: 0, y: 0};
-      this.a = {x: 0, y: 0};
-      this.m = 1;
-      this.status = "hungry";
-      this.o_m = 1;
-      this.id = 0;
-    }
+  constructor() {
+    this.x = 0; // x-coordinate of the person's position
+    this.y = 0; // y-coordinate of the person's position
 
-    getDistance(other) {
-      const dx = other.x - this.x;
-      const dy = other.y - this.y;
-      const distance = Math.sqrt(dx **2 + dy **2);
-      return distance
-    }
-    getKineticEnergy() {
-          const v = Math.sqrt(this.v.x * this.v.x + this.v.y * this.v.y);
-    
-          return 0.5 * this.m * v * v;
-    }
+    this.v = {x: 0, y: 0}; // Velocity vector (x and y components)
+
+    this.a = {x: 0, y: 0}; // Acceleration vector (x and y components)
+
+    this.m = 1; // Mass of the person
+
+    this.status = "hungry"; // Status of the person (e.g., hungry, tired, etc.)
+
+    this.o_m = 1; // Original mass of the person
+
+    this.id = 0; // Unique identifier for the person
+  }
+
+
+  getDistance(other) {
+    return Math.sqrt((other.x - this.x) ** 2 + (other.y - this.y) ** 2);
+  }
+  
+  getKineticEnergy() {
+    const v = Math.sqrt(this.v.x * this.v.x + this.v.y * this.v.y);
+    return 0.5 * this.m * v * v;
+  }
 
     move() {
         this.x += this.v.x;
@@ -31,30 +35,42 @@ class Person {
 
     getTotalEnergy() {
         const potentialEnergy = 1 * this.m; // assume a constant potential energy of 1 * m
-        const kineticEnergy = 0.5 * this.m * Math.sqrt(this.v.x * this.v.x + this.v.y * this.v.y);
+        const kineticEnergy = getKineticEnergy();
         return potentialEnergy + kineticEnergy;
     }
 
          
     exertForce(force) {
-        const prevLoc = {x: this.x, y: this.y};
-        const prevVelocity = {x: this.v.x, y: this.v.y};
-        const prevAcceleration = Math.sqrt(this.a.x * this.a.x + this.a.y * this.a.y);
-        const velocityAngle = Math.atan2(this.v.y, this.v.x);
-        this.a.x = force.x / this.m * Math.cos(velocityAngle);
-        this.a.y = force.y / this.m * Math.sin(velocityAngle);
-        const newAcceleration = Math.sqrt(this.a.x * this.a.x + this.a.y * this.a.y);
-        var distanceTraveled = 0;
-        if (prevAcceleration < newAcceleration) {
-          distanceTraveled = Math.sqrt(
-                (this.x - prevLoc.x) **2 + (this.y - prevLoc.y) **2);
-          this.m -= 0.1*force.x ;
-        };
-
+      // Store the previous location, velocity, and acceleration
+      const prevLoc = {x: this.x, y: this.y};
+      const prevVelocity = {x: this.v.x, y: this.v.y};
+      const prevAcceleration = Math.sqrt(this.a.x * this.a.x + this.a.y * this.a.y);
+    
+      // Calculate the angle of the velocity vector
+      const velocityAngle = Math.atan2(this.v.y, this.v.x);
+    
+      // Update the acceleration components based on the applied force
+      this.a.x = force.x / this.m * Math.cos(velocityAngle);
+      this.a.y = force.y / this.m * Math.sin(velocityAngle);
+    
+      // Calculate the new acceleration magnitude
+      const newAcceleration = Math.sqrt(this.a.x * this.a.x + this.a.y * this.a.y);
+    
+      var distanceTraveled = 0;
+    
+      // Check if the magnitude of acceleration has increased
+      if (prevAcceleration < newAcceleration) {
+        // Calculate the distance traveled by the person
+        distanceTraveled = Math.sqrt((this.x - prevLoc.x) ** 2 + (this.y - prevLoc.y) ** 2);
+    
+        // Reduce the mass of the person
+        this.m -= 0.1 * force.x;
       }
+    }
+    
 
     eat(other) {
-      const distance = Math.sqrt((this.x - other.x) **2 + (this.y - other.y) **2);
+      const distance = this.getDistance(other);
       if (distance <= this.m && this.m > other.m) {
         this.m += other.m;
         other.status = "dead";

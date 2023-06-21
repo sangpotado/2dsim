@@ -70,3 +70,23 @@ function drawInfo(p) {
 
   })
 }
+
+function drawBackground() {
+  const color1 = color(255, 0, 0);  // Starting color (red)
+  const color2 = color(0, 0, 255);  // Ending color (blue)
+  const blendingFactor = 0.005;  // Blending factor for smooth transition
+
+  for (let y = 0; y < height; y++) {
+    const blendedColor = lerpColor(color1, color2, y / height);
+    stroke(blendedColor);
+    line(0, y, width, y);
+  }
+
+  // Optional: Add blending effect for dynamic color change
+  const blendedColor = lerpColor(color1, color2, frameCount * blendingFactor);
+  fill(blendedColor);
+  noStroke();
+  rect(0, 0, width, height);
+
+
+}

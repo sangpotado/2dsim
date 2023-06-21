@@ -79,7 +79,9 @@ var drawTangent = function(P, w,h, u) {
 //draw Learn point
 var drawLearn = function(x,y) {
     fill(150,50,20);
-    ellipse(x,y,10)
+    for (let i=0; i< x.length; i++) {
+        ellipse(x[i],y[i],10);
+    }
 }
 //find index for Actualpoints x
 var findIndex = function(value, a) {
@@ -151,20 +153,6 @@ class Points {
         }
     }
 
-    // learn(rate) {
-    //     let i = findIndex(this.learnX,this.Actualpoints);
-
-    //     let s = findSlope(this.Actualpoints[i].x, this.Actualpoints[i].y, this.Actualpoints[i+1].x, this.Actualpoints[i+1].y);
-
-    //     this.learnX -= s.m*rate;
-    //     console.log(this.learnX);
-    
-    //     this.learnP = this.Screenpoints[i];
-
-    //     // console.log(i, this.learnP);
-    // }
-
-    // add points with mouse
     addPoints() {
         let p = {x:mouseX, y:mouseY};
         this.Screenpoints.push(p);
@@ -177,18 +165,29 @@ class Points {
 function drawInfo() {
     push();
     fill(50,240,80);
-    let loss = 0;
-    try {
-        loss = math.sum(math.map(math.subtract(l2.activated_z, y), math.square));
-        if (loss<0.0001) {TRAIN=false;}
-    } catch(error) {loss = 0};
+    
+    if (nn.loss<0.0001) {TRAIN=false;}
 
-    text(`generation: ${l2.gen}  // loss: ${loss}`, 5, 450);
+    text(`generation: ${gen}  // loss: ${nn.loss}`, 5, 450);
 }
 
 var P = new Points;
 
-var fP = new Points;
-fP.generatePoints(1024,512,20);
 
-var counts = -10;
+var DRAW = false;
+var TRAIN = false;
+var nn; //neural net
+var data;
+var x;
+var y;
+var nnPoints = new Points;    //output of nn
+var gen = 0;
+
+Add.activation('none',
+  (x) => {
+    return x;
+  },
+  (x) => {
+    return 1;
+  }
+);

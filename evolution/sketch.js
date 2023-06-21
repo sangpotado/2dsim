@@ -20,3 +20,20 @@ function draw() {
     text(`gen:${P.generation}`, 10,475);
 
 }
+
+function mousePressed() {
+    if (add_ob == 0) {
+        ob_x = mouseX;
+        ob_y = mouseY;
+        add_ob += 1
+    }
+    else if (add_ob == 1) {
+        obs.push(new Obstacle(ob_x, ob_y, mouseX-ob_x, mouseY - ob_y));
+        add_ob = 0;
+    }
+    // console.log("mousepress: ", mouseX, mouseY);
+  }
+
+function keyPressed() {
+    // console.log('keypress', keyCode);
+}

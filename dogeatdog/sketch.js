@@ -8,6 +8,7 @@ function draw() {
     // text("Frame Count with frameRate " + 
     // int(getFrameRate()), 250, 0);
     background(100, 200, 50);
+    // drawBackground();
     fill(100);
     rect(0, 512, width, 300);
     drawInfo(people);

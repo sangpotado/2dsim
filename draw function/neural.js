@@ -86,10 +86,7 @@ function sigmoid_prime(z) {
 
 var l1;
 var l2;
-var x;
-var y;
-var DRAW = false;
-var TRAIN = false;
+
 //testing
 // let l1 = new Layer(3,2, "first");
 // let l2 = new Layer(2,3, "last");
