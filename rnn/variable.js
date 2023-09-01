@@ -133,6 +133,17 @@ class Points {
         let p2 = convertScreenToActual(p.x, p.y, width, height, 20);
         this.Actualpoints.push(p2);
     }
+
+    generatePoints(w,h,u) {
+        for (let x=-5; x<0; x+= 0.02) {   //edit this to change the number of points drawn
+            let y = Math.sin(x*3);   //edit this to change the function
+            this.Actualpoints.push({x:x,y:y});
+        
+            let point = convertActualToScreen(x,y,w,h,u);
+            this.Screenpoints.push(point);
+
+        }
+    }
 }
 
 function drawInfo() {
@@ -141,7 +152,7 @@ function drawInfo() {
     
     if (nn.loss<0.0001) {TRAIN=false;}
 
-    text(`generation: ${gen}  // loss: ${nn.loss}`, 5, 450);
+    text(`generation: ${gen}  // loss: ${avgLoss}`, 5, 450);
 }
 
 var P = new Points;
@@ -151,9 +162,11 @@ var TRAIN = false;
 // var PREDICT_MODE = false;
 var nn; //neural net
 var dataset;
+var n_inputs = 30; //number of inputs to nn
 var x;
 var y;
 var gen = 0;
+var avgLoss = 0
 
 Add.activation('none',
   (x) => {
@@ -164,13 +177,14 @@ Add.activation('none',
   }
 );
 
-function generateDataset(x, y) {
+function generateDataset(x, y, u) {
+    // x = [], y = [], u is how many x read per data
     var dataset = [];
   
-    // Iterate until x.length - 10 to ensure enough elements for input and target
-    for (var i = 0; i <= x.length - 11; i++) {
-      var input = x.slice(i, i + 10); // Get the next 10 elements from x
-      var target = [x[i + 10], y[i + 10]]; // Get the corresponding elements from x and y as an array
+    // Iterate until x.length - (u+1) to ensure enough elements for input and target
+    for (var i = 0; i <= x.length - (u+1); i++) {
+      var input = x.slice(i, i + u); // Get the next 10 elements from x
+      var target = [x[i + u], y[i + u]]; // Get the corresponding elements from x and y as an array
   
       dataset.push({ input: input, target: target });
     }

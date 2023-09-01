@@ -28,14 +28,17 @@ function draw() {
     // if (keyIsDown(76)) { /// key L, learn manually
     //     train();
     // }
+    if (keyIsDown(80)) {predict();} //key P
 }
 
 function keyPressed() {
     if (keyCode == 65) {    //key A, create neural network with 2 layers and generate X and Y and dataset
         
-        nn = new Dann(10, 2);
-        nn.addHiddenLayer(20, 'softsign');
-        nn.addHiddenLayer(20, 'none');
+        // n_inputs = P.Actualpoints.length -2;
+
+        nn = new Dann(n_inputs, 2);
+        nn.addHiddenLayer(100, 'softsign');  //softsign
+        nn.addHiddenLayer(100, 'none');
         nn.outputActivation('none');
         nn.makeWeights();
         nn.lr = 0.0001;
@@ -44,7 +47,7 @@ function keyPressed() {
         x = getXValues(P.Actualpoints);
         y = getYValues(P.Actualpoints);
 
-        dataset = generateDataset(x,y);
+        dataset = generateDataset(x,y, n_inputs);
 
     }
     if (keyCode == 68) {    //key D
@@ -57,9 +60,9 @@ function keyPressed() {
         TRAIN = true;
         DRAW = true;
     }
-//     if (keyCode == 32) {
-
-//     }
+    if (keyCode == 78) {    //key N
+        P.generatePoints(width, height, 20);
+    }
 //     if (keyCode == 67) {
 //
 //     }
@@ -86,21 +89,25 @@ function mouseDragged() {
     P.addPoints(mouseX, mouseY);
 }
 function train() {
+
+    let sum = 0;
     for (data of dataset) {
         nn.backpropagate(data.input,data.target);
-        if (nn.loss < 1) {break;}
-        console.log(nn.loss);
+        sum += nn.loss;
+        // if (nn.loss >5) {
+        //     console.log(nn.loss);
+        // }
     }
-
-    // y = nn.feedForward(data.input,{log:true, decimals: 1}); //update y
+    avgLoss = sum/dataset.length;
+    // console.log('avg loss: ', avgLoss);
     gen ++; //epoch
 }
 
 function predict() {
-    x = getXValues(P.Actualpoints);
-    var xx = x.slice(x.length-11, x.length-1);
-    var actual_predict = nn.feedForward(xx,{log:false, decimals: 1});
+    x = getXValues(P.Actualpoints); //update x as new points were added
+    var xx = x.slice(x.length- n_inputs - 1, x.length -1);
+    var actual_predict = nn.feedForward(xx,{log:true, decimals: 1});
     var screen_predict = convertActualToScreen(actual_predict[0], actual_predict[1], 1024, 512, 20);
     P.addPoints(screen_predict.x, screen_predict.y);
-    console.log(xx, screen_predict, actual_predict );
+    // console.log(xx, actual_predict );
 }

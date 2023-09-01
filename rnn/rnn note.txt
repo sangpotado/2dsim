@@ -1,0 +1,35 @@
+Initialize parameters and hyperparameters:
+- Define the number of hidden units (H)
+- Define the number of input units (I)
+- Define the number of output units (O)
+- Initialize the weights and biases for the input-hidden, hidden-output connections
+- Define the learning rate (alpha)
+- Define the number of training iterations (epochs)
+
+Define the RNN architecture:
+- Create a hidden state vector (h) of size H
+- Create an input vector (x) of size I
+- Create an output vector (y) of size O
+
+Define the forward propagation step:
+- for each training iteration:
+  - Set the initial hidden state (h0) to zeros or random values
+  - for each time step (t) in the input sequence:
+    - Update the hidden state (ht) using the input (xt) and previous hidden state (ht-1)
+      - ht = activation_function(Weight_in_hidden * xt + Weight_hidden_hidden * ht-1 + bias_hidden)
+    - Compute the output (yt) using the hidden state (ht)
+      - yt = activation_function(Weight_hidden_out * ht + bias_out)
+
+Define the backward propagation step:
+- Calculate the error between predicted output (yt) and target output
+- Update the weights and biases using gradient descent and backpropagation through time (BPTT)
+
+Train the RNN:
+- for each training iteration:
+  - Perform forward propagation to compute predicted outputs
+  - Perform backward propagation to update weights and biases
+  - Adjust the learning rate if necessary (optional)
+
+Test the RNN:
+- Perform forward propagation on unseen data to obtain predictions
+
