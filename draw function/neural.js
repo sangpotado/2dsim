@@ -1,52 +1,36 @@
 class Layer {
-    constructor(n_inputs, n_neurons, id) {
-        this.weights = math.multiply(math.ones(n_inputs, n_neurons), Math.random());
-        this.bias = math.multiply(math.ones(n_neurons), Math.random());
-        this.dW = math.zeros(n_inputs, n_neurons);
-        this.dB = math.zeros(n_neurons);
-        this.z = [];
-        this.activated_z= [];
-        this.grad = [];
-        this.Actualpoints = [];
-        this.Screenpoints = [];
-        this.id = id;
-        this.gen = 0;
+    constructor(n_inputs, n_neurons, learnrate) {
+        this.weights = new Matrix(n_inputs, n_neurons);
+        this.weights.randomize(-0.5,0.5);
+        // this.bias = new Matrix(1, n_neurons);
+        // this.bias.randomize(-0.5,0.5);
+        // this.dW = new Matrix()
+        // this.dB = math.zeros(n_neurons);
+        // this.z = [];
+        // this.activated_z= [];
+        // this.grad = [];
+        // this.Actualpoints = [];
+        // this.Screenpoints = [];
+        this.learnrate = learnrate;
     }
 
     forward(x) {
-        this.z =math.add(math.multiply(x,this.weights), this.bias);
-        // this.activated_z = sigmoid(this.z);
-        this.activated_z = relu(this.z);
+        this.z = Matrix.mult(x, this.weights) //+ this.bias;
+        console.log('forwared, z: ', l1.z.toArray());
     }
 
-    //calculate delta_w and delta_b, the gradient of each weight and bias
-    backprop_last(y) {  //previous layer and next layer
-        //feed forward, calculate z and activated_z
-        // this.forward(x);
+    backprop(x,y) {  
+        let error = Matrix.sub(y, this.z);
+        error.mult(this.learnrate);
+        console.log('error: ', error.toArray());
 
-        //calculate delta for the last layer
-        //dotMultiply is * elementwise multiply
+        // calculate gradient
+        // db = this.bias.sub(error);
+        this.dw = Matrix.mult(Matrix.transpose(x), error);
 
-        // this.grad =  math.dotMultiply(math.subtract(this.activated_z, y), sigmoid_prime(this.z));
-        this.grad =  math.dotMultiply(math.subtract(this.activated_z, y), relu_prime(this.z));
-        this.dB = this.grad;
-        this.dW = math.dotMultiply(this.weights, this.grad);
-    }
-    backprop(next) {
-        // let grad_w = math.multiply(math.transpose(this.weights), next.grad);
-        let grad_w = math.multiply(next.grad, this.weights);
-
-        // this.grad = math.dotMultiply(grad_w, sigmoid_prime(this.z));
-        this.grad = math.dotMultiply(grad_w, relu_prime(this.z));
-        this.dB = this.grad;
-        this.dW = math.dotMultiply(this.grad,this.activated_z);
-    }
-
-
-    learn(rate) {
-        this.weights = math.subtract(this.weights, math.multiply(this.dW, rate));
-        this.bias = math.subtract(this.bias, math.multiply(this.dB,rate));
-        this.gen += 1;
+        // update weights
+        // this.bias = Matrix.sub(this.bias, error);
+        this.weights.add(this.dw);
     }
 
     generatePoints(x) {
@@ -84,12 +68,14 @@ function sigmoid_prime(z) {
     return sp;
 }
 
-var l1;
-var l2;
+var l1 = l1 = new Layer(5,3,0.01);
+var x = Matrix.fromArray([1,2,3,4,5]);
+var y = Matrix.fromArray([9,7,8]);
+x = Matrix.transpose(x);
+y = Matrix.transpose(y);
 
-//testing
-// let l1 = new Layer(3,2, "first");
-// let l2 = new Layer(2,3, "last");
-// var x = [1,2,3];
-// var y = [2,2,2];
-
+for (let i=0; i<10; i++) {
+    console.log('iteration: ', i);
+    l1.forward(x);
+    l1.backprop(x,y);
+}
