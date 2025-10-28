@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Learning Pathfinding Agent</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow-y: auto; background-color: #f7f7f7; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; font-family: 'Inter', sans-serif; }
+        .container { display: flex; flex-direction: column; align-items: center; padding: 20px; max-width: 640px; width: 100%; }
+        canvas { border: 2px solid #333; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 8px; }
+        .slider-group { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+        .slider-group label { font-weight: 500; font-size: 0.9rem; color: #374151; width: 40%; }
+        .slider-group output { font-weight: 700; color: #4338ca; width: 15%; text-align: right; }
+        .slider-group input { width: 45%; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800">Q-Learning Agent (Off-Policy TD)</h1>
+    <div id="canvas-container"></div>
+    
+    <!-- CONTROL PANEL ADDED HERE -->
+    <div id="controls" class="mt-4 p-4 bg-gray-50 shadow-xl rounded-lg w-full max-w-lg space-y-2">
+        <h2 class="text-xl font-extrabold text-indigo-700 border-b-2 border-indigo-200 pb-2 mb-3">Hyperparameters</h2>
+
+        <!-- LEARNING_RATE -->
+        <div class="slider-group">
+            <label for="learningRate">Learning Rate (α)</label>
+            <input type="range" id="learningRate" min="0.01" max="1" step="0.01" value="0.2">
+            <output id="learningRate-value">0.200</output>
+        </div>
+
+        <!-- DISCOUNT_FACTOR -->
+        <div class="slider-group">
+            <label for="discountFactor">Discount Factor (γ)</label>
+            <input type="range" id="discountFactor" min="0.01" max="0.999" step="0.001" value="0.99">
+            <output id="discountFactor-value">0.990</output>
+        </div>
+
+        <!-- EPSILON -->
+        <div class="slider-group">
+            <label for="epsilon">Exploration Rate (ε)</label>
+            <input type="range" id="epsilon" min="0.01" max="1" step="0.01" value="0.4">
+            <output id="epsilon-value">0.400</output>
+        </div>
+
+        <!-- EPSILON_DECAY -->
+        <div class="slider-group">
+            <label for="epsilonDecay">Decay Rate</label>
+            <input type="range" id="epsilonDecay" min="0.95" max="0.9999" step="0.0001" value="0.99">
+            <output id="epsilonDecay-value">0.9900</output>
+        </div>
+        
+        <!-- MIN_EPSILON -->
+        <div class="slider-group">
+            <label for="minEpsilon">Min Epsilon</label>
+            <input type="range" id="minEpsilon" min="0.001" max="0.5" step="0.001" value="0.05">
+            <output id="minEpsilon-value">0.050</output>
+        </div>
+        
+        <!-- BUDGET -->
+        <div class="slider-group pt-2 border-t mt-3 border-gray-200">
+            <label for="budget">Episode Budget (Steps)</label>
+            <input type="range" id="budget" min="10" max="500" step="1" value="15">
+            <output id="budget-value">15</output>
+        </div>
+        
+    </div>
+    <!-- END CONTROL PANEL -->
+
+    <div id="stats" class="mt-4 text-center p-3 bg-white shadow rounded-lg w-full max-w-lg">
+        <p class="text-sm text-gray-600">The agent learns the optimal path by maximizing Q-values.</p>
+        <div class="flex justify-around mt-2">
+            <span id="episodes" class="font-medium text-indigo-600">Episodes: 0</span>
+            <span id="q-status" class="font-medium text-purple-600">Q-Table Size: 0</span>
+        </div>
+    </div>
+</div>
+<script>
+// --- UTILITY FUNCTIONS ---
+
+// Function to convert Map<string, Map<string, number>> to JSON-compatible Object
+function qTableToPlainObject(qTable) {
+    const plainObject = {};
+    for (const [stateKey, actionMap] of qTable.entries()) {
+        plainObject[stateKey] = Object.fromEntries(actionMap);
+    }
+    return plainObject;
+}
+function downloadObjectAsJson(object, filename) {
+    const jsonString = JSON.stringify(object, null, 2); // Format with 2-space indentation
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+}
+// Function to convert JSON-compatible Object back to Map<string, Map<string, number>>
+function plainObjectToQTable(plainObject) {
+    const qTable = new Map();
+    for (const [stateKey, actionObject] of Object.entries(plainObject)) {
+        qTable.set(stateKey, new Map(Object.entries(actionObject).map(([k, v]) => [k, parseFloat(v)])));
+    }
+    return qTable;
+}
+// --- Q-LEARNING CONSTANTS & SETUP ---
+
+const WIDTH = 600;
+const HEIGHT = 400;
+const ORIGIN = { x: 30, y: 150 };
+const TARGET = { x: 550, y: 350 };
+
+// CHANGED TO LET for dynamic adjustment via sliders
+let BUDGET = 15; // Max steps per episode 
+const AGENT_SIZE = 5;
+const STEP_SIZE = 10;
+const NUGGET_RADIUS = 15; // How close the agent must be to 'collect' a nugget
+
+// Q-Learning Hyperparameters - CHANGED TO LET
+let LEARNING_RATE = 0.2; // Alpha (α) - How quickly we adopt new information
+let DISCOUNT_FACTOR = 0.99; // Gamma (γ) - Importance of future rewards (delayed reward)
+let EPSILON = 0.4; // Epsilon (ε) - Exploration rate (decays over time)
+let EPSILON_DECAY = 0.99;
+let MIN_EPSILON = 0.05;
+
+// All possible actions (dx, dy)
+const ACTIONS = [
+    // [STEP_SIZE, 0],       
+    // [-STEP_SIZE, 0],      
+    // [0, STEP_SIZE],       
+    // [0, -STEP_SIZE],      
+    [STEP_SIZE, STEP_SIZE],   
+    [STEP_SIZE, -STEP_SIZE],  
+    [-STEP_SIZE, STEP_SIZE],  
+    [-STEP_SIZE, -STEP_SIZE]  
+];
+
+let agent;
+let obstacles = [];
+let nuggets = [];
+let episodeCount = 0;
+let greedyPath = [];
+let minGreedySteps = Infinity;
+
+/**
+ * Creates a unique string key for a position.
+ * @param {number} x 
+ * @param {number} y 
+ * @returns {string}
+ */
+function getKey(x, y) {
+    return `${x},${y}`;
+}
+
+// --- CONTROL PANEL LOGIC ---
+
+/**
+ * Updates the global variable based on slider input and updates the output display.
+ * @param {string} id - The ID of the slider
+ * @param {string} value - The new value from the slider
+ */
+function updateParameter(id, value) {
+    const output = document.getElementById(id + '-value');
+    
+    switch(id) {
+        case 'learningRate':
+            LEARNING_RATE = parseFloat(value);
+            output.innerText = LEARNING_RATE.toFixed(3);
+            break;
+        case 'discountFactor':
+            DISCOUNT_FACTOR = parseFloat(value);
+            output.innerText = DISCOUNT_FACTOR.toFixed(3);
+            break;
+        case 'epsilon':
+            EPSILON = parseFloat(value);
+            output.innerText = EPSILON.toFixed(3);
+            break;
+        case 'epsilonDecay':
+            EPSILON_DECAY = parseFloat(value);
+            output.innerText = EPSILON_DECAY.toFixed(4);
+            break;
+        case 'minEpsilon':
+            MIN_EPSILON = parseFloat(value);
+            output.innerText = MIN_EPSILON.toFixed(3);
+            break;
+        case 'budget':
+            BUDGET = parseInt(value, 10);
+            output.innerText = BUDGET;
+            break;
+        default:
+            console.warn(`Unknown parameter ID: ${id}`);
+    }
+    // Update budget display in stats panel immediately
+    document.getElementById('budget-value').innerText = `${BUDGET}`;
+}
+
+// Attach event listeners when the window loads
+window.onload = function() {
+    // Find all range inputs within the controls div
+    document.querySelectorAll('#controls input[type="range"]').forEach(input => {
+        // Add listener for real-time updates
+        input.addEventListener('input', (e) => {
+            updateParameter(e.target.id, e.target.value);
+        });
+        // Initial sync: set the output text for all sliders
+        updateParameter(input.id, input.value);
+    });
+};
+
+
+// --- CLASS DEFINITIONS (Unchanged) ---
+class Nugget {
+    /**
+     * @param {number} x 
+     * @param {number} y 
+     * @param {number} reward - Positive reward given upon collection
+     */
+    constructor(x, y, reward) {
+        this.x = x;
+        this.y = y;
+        this.reward = reward;
+        this.isCollected = false;
+    }
+
+    draw() {
+        if (!this.isCollected) {
+            fill(255, 200, 0); // Gold color
+            noStroke();
+            ellipse(this.x, this.y, NUGGET_RADIUS * 2);
+            fill(50);
+            textAlign(CENTER, CENTER);
+            textSize(10);
+            text(`+${this.reward}`, this.x, this.y);
+        }
+    }
+}
+
+class Obstacle {
+    constructor(x, y, w, h) {
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+    }
+
+    draw() {
+        fill(45, 55, 72); // Dark gray
+        noStroke();
+        rect(this.x, this.y, this.w, this.h);
+    }
+
+    checkCollision(px, py) {
+        return (
+            px > this.x && 
+            px < this.x + this.w && 
+            py > this.y && 
+            py < this.y + this.h
+        );
+    }
+}
+
+class Agent {
+    constructor(x, y, width, height) {
+        this.origin = { x, y };
+        this.width = width;
+        this.height = height;
+        
+        // Q-Table: Map<StateKey "x,y", Map<ActionKey "dx,dy", Q_Value: number>>
+        this.qTable = new Map(); 
+        
+        this.reset();
+    }
+
+    reset() {
+        this.x = this.origin.x;
+        this.y = this.origin.y;
+        this.currentBudget = BUDGET; // Uses the global mutable BUDGET
+        this.alive = true;
+        this.memory = []; // Track path taken in the current episode
+        // Reset all nuggets for the new episode
+        for (const nugget of nuggets) {
+            nugget.isCollected = false;
+        }
+    }
+    
+    /**
+     * Retrieves the Q-Value for a given state-action pair, initializing it to 0 if not found.
+     * @param {string} stateKey - "x,y"
+     * @param {string} actionKey - "dx,dy"
+     * @returns {number} The Q-Value
+     */
+    getQValue(stateKey, actionKey) {
+        if (!this.qTable.has(stateKey)) {
+            // Initialize state with Q-values for all actions
+            const actionMap = new Map();
+            for (const [dx, dy] of ACTIONS) {
+                actionMap.set(getKey(dx, dy), 0);
+            }
+            this.qTable.set(stateKey, actionMap);
+        }
+        return this.qTable.get(stateKey).get(actionKey);
+    }
+
+    /**
+     * Finds the maximum Q-Value achievable from a given state.
+     * @param {string} stateKey - "x,y"
+     * @returns {number} max Q(s', a')
+     */
+    getMaxQValue(stateKey) {
+        if (!this.qTable.has(stateKey)) {
+            // Unvisited state, max Q-value is 0.
+            return 0; 
+        }
+        return Math.max(...this.qTable.get(stateKey).values());
+    }
+
+    /**
+     * Implements the ε-Greedy Policy to choose the next action.
+     * @param {string} stateKey - Current state key
+     * @returns {object | null} { dx, dy, actionKey } of the chosen action
+     */
+    chooseAction(stateKey) {
+        const availableActions = [];
+        for (const [dx, dy] of ACTIONS) {
+            const newX = this.x + dx;
+            const newY = this.y + dy;
+
+            // Check boundaries and obstacle collision for the potential move
+            if (newX > 0 && newX < this.width && newY > 0 && newY < this.height) {
+                if (!this.checkCollision(obstacles, newX, newY) && !this.memory.includes(getKey(newX,newY)) ) {
+                    availableActions.push({ dx, dy, actionKey: getKey(dx, dy) });
+                }
+            }
+        }
+
+        if (availableActions.length === 0) return null;
+
+        let chosenAction;
+
+        if (Math.random() < EPSILON) { // Uses the global mutable EPSILON
+            // EXPLORATION: Choose a random valid action
+            chosenAction = random(availableActions);
+        } else {
+            // EXPLOITATION: Choose the action with the max Q-Value
+            let maxQ = -Infinity;
+            let bestActions = [];
+
+            for (const action of availableActions) {
+                const qValue = this.getQValue(stateKey, action.actionKey);
+                
+                if (qValue > maxQ) {
+                    maxQ = qValue;
+                    bestActions = [action]; // Found a new best
+                } else if (qValue === maxQ) {
+                    bestActions.push(action); // Tie
+                }
+            }
+            // Break ties randomly
+            chosenAction = random(bestActions);
+        }
+        return chosenAction;
+    }
+    
+    /**
+     * Performs the Q-Learning Update (TD Control).
+     * @param {string} sKey - Previous state key (s)
+     * @param {string} aKey - Action key (a)
+     * @param {number} reward - Immediate reward (r)
+     * @param {string} sPrimeKey - Next state key (s')
+     */
+    updateQValue(sKey, aKey, reward, sPrimeKey) {
+        const oldQ = this.getQValue(sKey, aKey);
+        
+        // Find the Maximum Q-value from the next state (s')
+        const maxQPrime = this.getMaxQValue(sPrimeKey); 
+        
+        // Q-Learning Formula uses global mutable LEARNING_RATE and DISCOUNT_FACTOR
+        // Q(s,a) <- Q(s,a) + α * [r + γ * max Q(s',a') - Q(s,a)]
+        const temporalDifference = reward + DISCOUNT_FACTOR * maxQPrime - oldQ;
+        const newQ = oldQ + LEARNING_RATE * temporalDifference;
+        
+        // Update the Q-Table
+        this.qTable.get(sKey).set(aKey, newQ);
+        this.updateStats();
+    }
+    /**
+     * Calculates reward if nugget collected
+     * @returns {number} The immediate reward
+    */
+    getImmediateReward() {
+        let reward = dist(this.x, this.y, ORIGIN.x, ORIGIN.y)/10 -dist(this.x, this.y, TARGET.x, TARGET.y)/10; // dist(this.x, this.y, ORIGIN.x, ORIGIN.y)/10 
+
+        // Check for Nugget collection (Reward Shaping)
+        for (const nugget of nuggets) {
+            if (!nugget.isCollected) {
+                if (dist(this.x, this.y, nugget.x, nugget.y) < NUGGET_RADIUS) {
+                    reward += nugget.reward;
+                    nugget.isCollected = true;
+                }
+            }
+        }
+        return reward;
+    }
+    act(action) {
+        if (!action) {
+            this.alive = false;
+            return;
+        }
+
+        // 1. Store current position (s) and action (a)
+        const sKey = getKey(this.x, this.y);
+        const aKey = action.actionKey;
+        
+        // 2. calculate immediate reward BEFORE moving
+        let reward = this.getImmediateReward();
+
+        // 3. Update position (s')
+        this.x += action.dx;
+        this.y += action.dy;
+        this.currentBudget -= 1;
+        
+        const sPrimeKey = getKey(this.x, this.y);
+        this.memory.push(sKey);
+        
+        let isTerminal = false;
+
+        if (this.currentBudget <= 0) {
+            reward = -50; // Penalty for budget exhaustion + 
+            // reward = -dist(this.x, this.y, TARGET.x, TARGET.y);
+            isTerminal = true;
+        } else if (this.checkCollision(obstacles)) {
+            reward = -100; // Large penalty for collision
+            isTerminal = true;
+        } else if (dist(this.x, this.y, TARGET.x, TARGET.y) < 10) {
+            reward = 1000; // Large reward for reaching the target
+            isTerminal = true;
+        }
+        
+        // Perform the Q-Learning Update
+        this.updateQValue(sKey, aKey, reward, isTerminal ? sKey : sPrimeKey);
+        // Note: If terminal, s' has no future value, so we use sKey for maxQPrime 
+        // which will be 0 (since only non-terminal states are in qTable).
+        
+        if (isTerminal) {
+            this.alive = false;
+        }
+    }
+
+    checkCollision(objs, px = this.x, py = this.y) {
+        // Obstacle collision
+        for (const obj of objs) {
+            if (obj.checkCollision(px, py)) {
+                return true;
+            }
+        }
+        
+        // Boundary collision (using AGENT_SIZE as a simple radius/buffer)
+        const radius = AGENT_SIZE / 2;
+        if (px - radius < 0 || px + radius > this.width || 
+            py - radius < 0 || py + radius > this.height) {
+            return true;
+        }
+        return false;
+    }
+
+    live(objs) {
+        if (!this.alive) {
+            // Decay epsilon using global mutable EPSILON_DECAY and MIN_EPSILON
+            EPSILON = Math.max(MIN_EPSILON, EPSILON * EPSILON_DECAY);
+
+            this.reset();
+            // Re-calculate the greedy path periodically (e.g., every 20 episodes)
+            if (episodeCount % 20 === 0) {
+                this.calculateBestPath();
+                BUDGET += 2;
+            }
+            episodeCount++;
+            return;
+        }
+        
+        const sKey = getKey(this.x, this.y);
+        const action = this.chooseAction(sKey);
+        this.act(action);
+    }
+    
+    // --- VISUALIZATION METHODS ---
+
+    /**
+     * Executes a purely greedy run based on the current Q-Table.
+     */
+    calculateBestPath() {
+        let currentX = ORIGIN.x;
+        let currentY = ORIGIN.y;
+        let steps = 0;
+        let path = [getKey(currentX, currentY)];
+        let localBudget = BUDGET * 2; // Use current global BUDGET for calc
+
+        while (localBudget-- > 0) {
+            const sKey = getKey(currentX, currentY);
+            
+            if (dist(currentX, currentY, TARGET.x, TARGET.y) < 10) {
+                break; // Target reached
+            }
+
+            if (!this.qTable.has(sKey)) {
+                break; // Unvisited state, can't continue greedily
+            }
+
+            // Find the action with the absolute highest Q-Value
+            const qMap = this.qTable.get(sKey);
+            let maxQ = -Infinity;
+            let bestActionKey = null;
+
+            for (const [aKey, qValue] of qMap.entries()) {
+                let [dx, dy] = aKey.split(',').map(Number);
+                let potentialX = currentX + dx;
+                let potentialY = currentY + dy;
+
+                if (qValue > maxQ && !path.includes(getKey(potentialX, potentialY))) {
+                    maxQ = qValue;
+                    bestActionKey = aKey;
+                }
+            }
+
+            if (bestActionKey) {
+                const [dx, dy] = bestActionKey.split(',').map(Number);
+                currentX += dx;
+                currentY += dy;
+                path.push(getKey(currentX, currentY));
+                steps++;
+            } else {
+                break; // No action available
+            }
+        }
+        
+        greedyPath = path;
+        if (steps > 0 && steps < minGreedySteps) {
+            minGreedySteps = steps;
+        }
+    }
+
+    updateStats() {
+        document.getElementById('episodes').innerText = `Episodes: ${episodeCount}`;
+        document.getElementById('q-status').innerText = `Q-Table Size: ${this.qTable.size} states`;
+        document.getElementById('epsilon-value').innerText = EPSILON.toFixed(3);
+        document.getElementById('budget-value').innerText = BUDGET.toFixed(3);
+        
+        // document.getElementById('best-steps').innerText = `Greedy Steps: ${minGreedySteps === Infinity ? 'N/A' : minGreedySteps}`;
+        // Note: Current budget display is updated by the slider logic
+    }
+
+    draw() {
+        // Draw the current exploration path (faint)
+        this.drawPath(this.memory, color(0, 150, 0, 70), 1); 
+
+        // Draw the derived best path (learned by Q-Table)
+        this.drawPath(greedyPath, color(255, 69, 0), 2); // Orange/Red
+
+        // Draw the target
+        fill(255, 255, 0, 200); 
+        noStroke();
+        ellipse(TARGET.x, TARGET.y, 20);
+        fill(0);
+        textAlign(CENTER, CENTER);
+        textSize(10);
+        text('Target', TARGET.x, TARGET.y);
+
+        // Draw the agent
+        stroke(255);
+        fill(0, 0, 0); // Black for the exploring agent
+        ellipse(this.x, this.y, AGENT_SIZE * 2);
+
+        // Draw start
+        fill(0, 255, 0, 150);
+        noStroke();
+        ellipse(ORIGIN.x, ORIGIN.y, 10);
+    }
+
+    drawPath(pathKeys, pathColor, weight) {
+        if (pathKeys.length < 2) return;
+        
+        stroke(pathColor);
+        strokeWeight(weight);
+        noFill();
+        beginShape();
+        
+        for (const key of pathKeys) {
+            const [x, y] = key.split(',').map(Number);
+            vertex(x, y);
+        }
+        endShape();
+    }
+}
+
+
+// --- P5.JS FUNCTIONS ---
+function roundToNearestTen(number) {
+    return Math.round(number / 10) * 10;
+}
+//show location of the mouse, according to the actual coordinate
+var drawMouse = function() {
+    fill(0,0,0);
+    ellipse(mouseX, mouseY, 5);
+    let x = roundToNearestTen(mouseX);
+    let y = roundToNearestTen(mouseY);
+    let qval = agent.getMaxQValue(getKey(x,y)).toFixed(3);
+    textSize(15);
+    text(`${qval}`, x, y-10);
+}
+function setup() {
+    const canvas = createCanvas(WIDTH, HEIGHT);
+    canvas.parent('canvas-container');
+    
+    // Create Obstacles
+    obstacles.push(new Obstacle(150, 50, 40, 300));
+    obstacles.push(new Obstacle(300, 0, 50, 250));
+    obstacles.push(new Obstacle(450, 150, 40, 250));
+
+    // NEW: Create Nuggets
+    // nuggets.push(new Nugget(30, 200, 25));
+    // nuggets.push(new Nugget(30, 300, 25))
+    // nuggets.push(new Nugget(80, 370,25));
+    // nuggets.push(new Nugget(200, 370,25));
+    // nuggets.push(new Nugget(380, 350, 50)); 
+    // nuggets.push(new Nugget(390, 150,25));  
+    // nuggets.push(new Nugget(500, 100, 75));
+    // nuggets.push(new Nugget(530, 250, 50));
+    // Create Agent
+    agent = new Agent(ORIGIN.x, ORIGIN.y, WIDTH, HEIGHT);
+    
+    // Set a high frame rate for fast learning
+    frameRate(60); 
+}
+
+function draw() {
+    background(240); 
+
+    // Draw obstacles
+    for (const obj of obstacles) {
+        obj.draw();
+    }
+    for (const nugget of nuggets) {
+        nugget.draw();
+    }
+    // Agent's lifecycle runs every frame
+    agent.live(obstacles);
+    
+    // Draw everything
+    agent.draw();
+    drawMouse();
+}
+</script>
+</body>
+</html>

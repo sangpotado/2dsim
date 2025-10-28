@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Learning Pathfinding Agent</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow-y: auto; background-color: #f7f7f7; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; font-family: 'Inter', sans-serif; }
+        .container { display: flex; flex-direction: column; align-items: center; padding: 20px; max-width: 640px; width: 100%; }
+        canvas { border: 2px solid #333; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 8px; cursor: crosshair; }
+        .slider-group { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+        .slider-group label { font-weight: 500; font-size: 0.9rem; color: #374151; width: 40%; }
+        .slider-group output { font-weight: 700; color: #4338ca; width: 15%; text-align: right; }
+        .slider-group input { width: 45%; }
+        /* Toggle Button Styles */
+        .toggle-btn[data-active="true"] {
+            background-color: #10b981; /* Tailwind green-600 */
+            color: white;
+        }
+        .toggle-btn[data-active="false"] {
+            background-color: #ef4444; /* Tailwind red-500 */
+            color: white;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800">Q-Learning Agent (Off-Policy TD)</h1>
+    <div id="canvas-container"></div>
+    
+    <!-- CONTROL PANEL UPDATED HERE -->
+    <div id="controls" class="mt-4 p-4 bg-gray-50 shadow-xl rounded-lg w-full max-w-lg space-y-2">
+        <h2 class="text-xl font-extrabold text-indigo-700 border-b-2 border-indigo-200 pb-2 mb-3">Hyperparameters</h2>
+
+        <!-- LEARNING_RATE -->
+        <div class="slider-group">
+            <label for="learningRate">Learning Rate (α)</label>
+            <input type="range" id="learningRate" min="0.01" max="1" step="0.01" value="0.2">
+            <output id="learningRate-value">0.200</output>
+        </div>
+
+        <!-- DISCOUNT_FACTOR -->
+        <div class="slider-group">
+            <label for="discountFactor">Discount Factor (γ)</label>
+            <input type="range" id="discountFactor" min="0.01" max="0.999" step="0.001" value="0.99">
+            <output id="discountFactor-value">0.990</output>
+        </div>
+
+        <!-- EPSILON -->
+        <div class="slider-group">
+            <label for="epsilon">Exploration Rate (ε)</label>
+            <input type="range" id="epsilon" min="0.01" max="1" step="0.01" value="0.4">
+            <output id="epsilon-value">0.400</output>
+        </div>
+
+        <!-- EPSILON_DECAY -->
+        <div class="slider-group">
+            <label for="epsilonDecay">Decay Rate</label>
+            <input type="range" id="epsilonDecay" min="0.95" max="0.9999" step="0.0001" value="0.99">
+            <output id="epsilonDecay-value">0.9900</output>
+        </div>
+        
+        <!-- MIN_EPSILON -->
+        <div class="slider-group">
+            <label for="minEpsilon">Min Epsilon</label>
+            <input type="range" id="minEpsilon" min="0.001" max="0.5" step="0.001" value="0.05">
+            <output id="minEpsilon-value">0.050</output>
+        </div>
+        
+        <!-- BUDGET -->
+        <div class="slider-group">
+            <label for="budget">Episode Budget (Steps)</label>
+            <input type="range" id="budget" min="10" max="500" step="1" value="15">
+            <output id="budget-value">15</output>
+        </div>
+
+        <!-- NEW: Toggle Buttons for Environment -->
+        <div class="flex justify-between space-x-4 pt-4 border-t mt-3 border-gray-200">
+            <button id="toggle-obstacles" class="toggle-btn w-1/2 p-2 rounded-lg font-bold transition duration-300" data-active="false">
+                Obstacles: OFF
+            </button>
+            <button id="toggle-nuggets" class="toggle-btn w-1/2 p-2 rounded-lg font-bold transition duration-300" data-active="false">
+                Nuggets: OFF (Click to Add)
+            </button>
+        </div>
+        
+    </div>
+    <!-- END CONTROL PANEL -->
+
+    <div id="stats" class="mt-4 text-center p-3 bg-white shadow rounded-lg w-full max-w-lg">
+        <p class="text-sm text-gray-600">The agent learns the optimal path by maximizing Q-values.</p>
+        <div class="flex justify-around mt-2">
+            <span id="episodes" class="font-medium text-indigo-600">Episodes: 0</span>
+            <span id="q-status" class="font-medium text-purple-600">Q-Table Size: 0</span>
+        </div>
+    </div>
+</div>
+<script>
+// --- Q-LEARNING CONSTANTS & SETUP ---
+
+const WIDTH = 600;
+const HEIGHT = 400;
+const ORIGIN = { x: 30, y: 150 };
+const TARGET = { x: 550, y: 350 };
+
+// Hyperparameters (Mutable)
+let BUDGET = 15; 
+const AGENT_SIZE = 5;
+const STEP_SIZE = 10;
+const NUGGET_REWARD = 50; 
+const NUGGET_RADIUS = 15; 
+
+let LEARNING_RATE = 0.2; 
+let DISCOUNT_FACTOR = 0.99; 
+let EPSILON = 0.4; 
+let EPSILON_DECAY = 0.99;
+let MIN_EPSILON = 0.05;
+
+// Environment State Toggles
+let obstaclesActive = false;
+let nuggetsActive = false;
+
+// All possible actions (dx, dy)
+const ACTIONS = [
+    // [STEP_SIZE, 0],       
+    // [-STEP_SIZE, 0],      
+    // [0, STEP_SIZE],       
+    // [0, -STEP_SIZE],
+    [STEP_SIZE, STEP_SIZE],   
+    [STEP_SIZE, -STEP_SIZE],  
+    [-STEP_SIZE, STEP_SIZE],  
+    [-STEP_SIZE, -STEP_SIZE]  
+];
+
+let agent;
+let obstacles = [];
+let nuggets = [];
+let episodeCount = 0;
+let greedyPath = [];
+let minGreedySteps = Infinity;
+
+// Define initial environmental elements
+const HARDCODED_OBSTACLES = [
+    { x: 150, y: 50, w: 40, h: 300 },
+    { x: 300, y: 0, w: 50, h: 250 },
+    { x: 450, y: 150, w: 40, h: 250 }
+];
+const HARDCODED_NUGGETS = [
+    { x: 30, y: 200, reward: 25 },
+    { x: 80, y: 370, reward: 25 },
+    { x: 380, y: 350, reward: 50 }, 
+    { x: 500, y: 100, reward: 75 }
+];
+
+
+// --- UTILITY FUNCTIONS ---
+
+/**
+ * Creates a unique string key for a position.
+ * @param {number} x 
+ * @param {number} y 
+ * @returns {string}
+ */
+function getKey(x, y) {
+    return `${x},${y}`;
+}
+
+// --- CONTROL PANEL LOGIC ---
+
+/**
+ * Updates the global variable based on slider input and updates the output display.
+ */
+function updateParameter(id, value) {
+    const output = document.getElementById(id + '-value');
+    const floatVal = parseFloat(value);
+    
+    switch(id) {
+        case 'learningRate':
+            LEARNING_RATE = floatVal;
+            output.innerText = LEARNING_RATE.toFixed(3);
+            break;
+        case 'discountFactor':
+            DISCOUNT_FACTOR = floatVal;
+            output.innerText = DISCOUNT_FACTOR.toFixed(3);
+            break;
+        case 'epsilon':
+            EPSILON = floatVal;
+            output.innerText = EPSILON.toFixed(3);
+            break;
+        case 'epsilonDecay':
+            EPSILON_DECAY = floatVal;
+            output.innerText = EPSILON_DECAY.toFixed(4);
+            break;
+        case 'minEpsilon':
+            MIN_EPSILON = floatVal;
+            output.innerText = MIN_EPSILON.toFixed(3);
+            break;
+        case 'budget':
+            BUDGET = parseInt(value, 10);
+            output.innerText = BUDGET;
+            if (agent) agent.reset();
+            break;
+        default:
+            console.warn(`Unknown parameter ID: ${id}`);
+    }
+}
+
+/** Toggles the state of obstacles. */
+function toggleObstacles() {
+    obstaclesActive = !obstaclesActive;
+    const btn = document.getElementById('toggle-obstacles');
+    btn.setAttribute('data-active', obstaclesActive);
+    btn.innerText = `Obstacles: ${obstaclesActive ? 'ON' : 'OFF'}`;
+    
+    obstacles.length = 0; // Clear current obstacles
+    if (obstaclesActive) {
+        HARDCODED_OBSTACLES.forEach(o => obstacles.push(new Obstacle(o.x, o.y, o.w, o.h)));
+    }
+    // Force agent reset to avoid being stuck inside a newly created obstacle
+    if (agent) agent.reset(); 
+}
+
+/** Toggles the state of nuggets. */
+function toggleNuggets() {
+    nuggetsActive = !nuggetsActive;
+    const btn = document.getElementById('toggle-nuggets');
+    btn.setAttribute('data-active', nuggetsActive);
+    btn.innerText = `Nuggets: ${nuggetsActive ? 'ON (Click to Add)' : 'OFF'}`;
+    
+    // Clear all current nuggets (including user-added ones)
+    nuggets.length = 0; 
+    if (nuggetsActive) {
+        HARDCODED_NUGGETS.forEach(n => nuggets.push(new Nugget(n.x, n.y, n.reward)));
+    }
+    // Reset agent to refresh collection status
+    if (agent) agent.reset();
+}
+
+window.onload = function() {
+    // 1. Setup Slider Listeners
+    document.querySelectorAll('#controls input[type="range"]').forEach(input => {
+        input.addEventListener('input', (e) => updateParameter(e.target.id, e.target.value));
+        updateParameter(input.id, input.value); // Initial sync
+    });
+    
+    // 2. Setup Button Listeners
+    document.getElementById('toggle-obstacles').addEventListener('click', toggleObstacles);
+    document.getElementById('toggle-nuggets').addEventListener('click', toggleNuggets);
+    
+    // Set initial button states
+    document.getElementById('toggle-obstacles').setAttribute('data-active', obstaclesActive);
+    document.getElementById('toggle-nuggets').setAttribute('data-active', nuggetsActive);
+};
+
+// --- CLASS DEFINITIONS ---
+class Nugget {
+    constructor(x, y, reward) {
+        this.x = x;
+        this.y = y;
+        this.reward = reward;
+        this.isCollected = false;
+    }
+
+    draw() {
+        if (!this.isCollected) {
+            fill(255, 200, 0); // Gold color
+            noStroke();
+            ellipse(this.x, this.y, NUGGET_RADIUS * 2);
+            fill(50);
+            textAlign(CENTER, CENTER);
+            textSize(10);
+            text(`+${this.reward}`, this.x, this.y);
+        }
+    }
+}
+
+class Obstacle {
+    constructor(x, y, w, h) {
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+    }
+
+    draw() {
+        fill(45, 55, 72); // Dark gray
+        noStroke();
+        rect(this.x, this.y, this.w, this.h);
+    }
+
+    checkCollision(px, py) {
+        return (
+            px > this.x && 
+            px < this.x + this.w && 
+            py > this.y && 
+            py < this.y + this.h
+        );
+    }
+}
+
+class Agent {
+    constructor(x, y, width, height) {
+        this.origin = { x, y };
+        this.width = width;
+        this.height = height;
+        this.qTable = new Map(); 
+        this.reset();
+    }
+
+    reset() {
+        this.x = this.origin.x;
+        this.y = this.origin.y;
+        this.currentBudget = BUDGET; 
+        this.alive = true;
+        this.memory = []; 
+        // Only reset the collection status of active nuggets
+        if (nuggetsActive) {
+            for (const nugget of nuggets) {
+                nugget.isCollected = false;
+            }
+        }
+    }
+    
+    getQValue(stateKey, actionKey) {
+        if (!this.qTable.has(stateKey)) { // if never visited 
+            const actionMap = new Map();
+            for (const [dx, dy] of ACTIONS) {
+                actionMap.set(getKey(dx, dy), 0);
+            }
+            this.qTable.set(stateKey, actionMap);
+        }
+        return this.qTable.get(stateKey).get(actionKey);
+    }
+
+    getMaxQValue(stateKey) {
+        if (!this.qTable.has(stateKey)) {
+            return 0; 
+        }
+        return Math.max(...this.qTable.get(stateKey).values());
+    }
+
+    chooseAction(stateKey) {
+        const availableActions = [];
+        for (const [dx, dy] of ACTIONS) {
+            const newX = this.x + dx;
+            const newY = this.y + dy;
+
+            if (newX > 0 && newX < this.width && newY > 0 && newY < this.height) {
+                if (!this.checkCollision(obstacles, newX, newY) && !this.memory.includes(getKey(newX, newY))) {
+                    availableActions.push({ dx, dy, actionKey: getKey(dx, dy) });
+                }
+            }
+        }
+
+        if (availableActions.length === 0) return null;
+
+        let chosenAction;
+
+        if (Math.random() < EPSILON) {
+            chosenAction = random(availableActions);
+        } else {
+            let maxQ = -Infinity;
+            let bestActions = [];
+
+            for (const action of availableActions) {
+                const qValue = this.getQValue(stateKey, action.actionKey);
+                
+                if (qValue > maxQ) {
+                    maxQ = qValue;
+                    bestActions = [action]; 
+                } else if (qValue === maxQ) {
+                    bestActions.push(action); 
+                }
+            }
+            chosenAction = random(bestActions);
+        }
+        return chosenAction;
+    }
+    
+    updateQValue(sKey, aKey, reward, sPrimeKey) {
+        const oldQ = this.getQValue(sKey, aKey);
+        const maxQPrime = this.getMaxQValue(sPrimeKey); 
+        
+        const temporalDifference = reward + DISCOUNT_FACTOR * maxQPrime - oldQ;
+        const newQ = oldQ + LEARNING_RATE * temporalDifference;
+        
+        this.qTable.get(sKey).set(aKey, newQ);
+        this.updateStats();
+    }
+    
+    getImmediateReward() {
+        // Use a base reward to encourage movement towards the goal
+        let reward = dist(this.x, this.y, ORIGIN.x, ORIGIN.y)/10 - dist(this.x, this.y, TARGET.x, TARGET.y)/10;
+
+        // Check for Nugget collection (Reward Shaping)
+        if (nuggetsActive) {
+            for (const nugget of nuggets) {
+                if (!nugget.isCollected) {
+                    if (dist(this.x, this.y, nugget.x, nugget.y) < NUGGET_RADIUS) {
+                        reward += nugget.reward;
+                        nugget.isCollected = true;
+                    }
+                }
+            }
+        }
+        return reward;
+    }
+    
+    act(action) {
+        if (!action) {
+            this.alive = false;
+            return;
+        }
+
+        const sKey = getKey(this.x, this.y);
+        const aKey = action.actionKey;
+        
+        let reward = this.getImmediateReward(); // BEFORE move
+
+        this.x += action.dx;
+        this.y += action.dy;
+        this.currentBudget -= 1;
+        
+        const sPrimeKey = getKey(this.x, this.y);
+        this.memory.push(sKey);
+        
+        let isTerminal = false;
+
+        if (this.currentBudget <= 0) {
+            reward = -50; 
+            isTerminal = true;
+        } else if (obstaclesActive && this.checkCollision(obstacles)) {
+            // Only penalize for collision if obstacles are active
+            reward = -100; 
+            isTerminal = true;
+        } else if (dist(this.x, this.y, TARGET.x, TARGET.y) < 10) {
+            reward = 1000; 
+            isTerminal = true;
+        }
+        
+        //  If terminal, s' has no future value, so we use sKey for maxQPrime 
+        // which will be 0 (since only non-terminal states are in qTable).
+        this.updateQValue(sKey, aKey, reward, isTerminal ? sKey : sPrimeKey);
+        
+        if (isTerminal) {
+            this.alive = false;
+        }
+    }
+
+    checkCollision(objs, px = this.x, py = this.y) {
+        // Obstacle collision
+        for (const obj of objs) {
+            if (obj.checkCollision(px, py)) {
+                return true;
+            }
+        }
+        
+        // Boundary collision
+        const radius = AGENT_SIZE / 2;
+        if (px - radius < 0 || px + radius > this.width || 
+            py - radius < 0 || py + radius > this.height) {
+            return true;
+        }
+        return false;
+    }
+
+    live(objs) {
+        if (!this.alive) {
+            // Decay epsilon
+            EPSILON = Math.max(MIN_EPSILON, EPSILON * EPSILON_DECAY);
+            // add more steps for next episode
+
+            this.reset();
+            if (episodeCount % 20 === 0) {
+                 this.calculateBestPath();
+                 BUDGET += 2;
+            }
+            episodeCount++;
+            this.updateStats(); // Update stats after episode completes and epsilon decays
+            return;
+        }
+        
+        const sKey = getKey(this.x, this.y);
+        const action = this.chooseAction(sKey);
+        this.act(action);
+    }
+    
+    // ... (calculateBestPath and draw methods remain largely the same) ...
+    calculateBestPath() {
+        let currentX = ORIGIN.x;
+        let currentY = ORIGIN.y;
+        let steps = 0;
+        let path = [getKey(currentX, currentY)];
+        let localBudget = BUDGET * 2; 
+
+        while (localBudget-- > 0) {
+            const sKey = getKey(currentX, currentY);
+            
+            if (dist(currentX, currentY, TARGET.x, TARGET.y) < 10) {
+                break;  // Target reached
+            }
+
+            if (!this.qTable.has(sKey)) {
+                break; 
+            }
+
+            const qMap = this.qTable.get(sKey);
+            let maxQ = -Infinity;
+            let bestActionKey = null;
+
+            for (const [aKey, qValue] of qMap.entries()) {
+                let [dx, dy] = aKey.split(',').map(Number);
+                let potentialX = currentX + dx;
+                let potentialY = currentY + dy;
+
+                if (qValue > maxQ && !path.includes(getKey(potentialX, potentialY))) {
+                    maxQ = qValue;
+                    bestActionKey = aKey;
+                }
+            }
+
+            if (bestActionKey) {
+                const [dx, dy] = bestActionKey.split(',').map(Number);
+                currentX += dx;
+                currentY += dy;
+                path.push(getKey(currentX, currentY));
+                steps++;
+            } else {
+                break; 
+            }
+        }
+        
+        greedyPath = path;
+        if (steps > 0 && steps < minGreedySteps) {
+            minGreedySteps = steps;
+        }
+    }
+
+    updateStats() {
+        document.getElementById('episodes').innerText = `Episodes: ${episodeCount}`;
+        document.getElementById('q-status').innerText = `Q-Table Size: ${this.qTable.size} states`;
+        // Corrected the display of decayed epsilon and budget (should be integer)
+        document.getElementById('epsilon-value').innerText = EPSILON.toFixed(3);
+        document.getElementById('budget-value').innerText = BUDGET.toFixed(0); 
+    }
+
+    draw() {
+        this.drawPath(this.memory, color(0, 150, 0, 70), 1); 
+        this.drawPath(greedyPath, color(255, 69, 0), 2); 
+
+        // Draw the target
+        fill(255, 255, 0, 200); 
+        noStroke();
+        ellipse(TARGET.x, TARGET.y, 20);
+        fill(0);
+        textAlign(CENTER, CENTER);
+        textSize(10);
+        text('Target', TARGET.x, TARGET.y);
+
+        // Draw the agent
+        stroke(255);
+        fill(0, 0, 0); 
+        ellipse(this.x, this.y, AGENT_SIZE * 2);
+
+        // Draw start
+        fill(0, 255, 0, 150);
+        noStroke();
+        ellipse(ORIGIN.x, ORIGIN.y, 10);
+    }
+
+    drawPath(pathKeys, pathColor, weight) {
+        if (pathKeys.length < 2) return;
+        
+        stroke(pathColor);
+        strokeWeight(weight);
+        noFill();
+        beginShape();
+        
+        for (const key of pathKeys) {
+            const [x, y] = key.split(',').map(Number);
+            vertex(x, y);
+        }
+        endShape();
+    }
+}
+
+
+// --- P5.JS FUNCTIONS ---
+function roundToNearestTen(number) {
+    return Math.round(number / 10) * 10;
+}
+//show location of the mouse, according to the actual coordinate
+var drawMouse = function() {
+    fill(0,0,0);
+    ellipse(mouseX, mouseY, 5);
+    let x = roundToNearestTen(mouseX);
+    let y = roundToNearestTen(mouseY);
+    // Only display Q-value if mouse is inside the canvas
+    if (mouseX >= 0 && mouseX <= WIDTH && mouseY >= 0 && mouseY <= HEIGHT) {
+        let qval = agent.getMaxQValue(getKey(x,y)).toFixed(3);
+        textSize(15);
+        text(`${qval}`, x, y-10);
+    }
+}
+function setup() {
+    const canvas = createCanvas(WIDTH, HEIGHT);
+    canvas.parent('canvas-container');
+    
+    // Create Agent
+    agent = new Agent(ORIGIN.x, ORIGIN.y, WIDTH, HEIGHT);
+    
+    // Set a high frame rate for fast learning
+    frameRate(60); 
+}
+
+function draw() {
+    background(240); 
+
+    // Draw active obstacles and nuggets
+    for (const obj of obstacles) { obj.draw(); }
+    for (const nugget of nuggets) { nugget.draw(); }
+
+    agent.live(obstacles);
+    agent.draw();
+    drawMouse();
+}
+
+/**
+ * NEW: Function to add a nugget on mouse click.
+ * This is a built-in p5.js function.
+ */
+function mouseClicked() {
+    // Check if the click is within the canvas bounds and nuggets are active
+    if (mouseX > 0 && mouseX < WIDTH && mouseY > 0 && mouseY < HEIGHT && nuggetsActive) {
+        // Round to nearest STEP_SIZE (10) to align with the grid states
+        const newX = roundToNearestTen(mouseX);
+        const newY = roundToNearestTen(mouseY);
+        
+        // Ensure the new nugget is not too close to an obstacle/boundary, 
+        // though the agent's movement logic handles this primarily.
+        
+        // Add a new nugget with a reward of 50
+        nuggets.push(new Nugget(newX, newY, 50));
+        
+        // Reset the agent to ensure the new state is considered in future episodes
+        agent.reset(); 
+        
+        // Disable default p5 context menu on right click
+        return false;
+    }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,501 @@
+<!-- <!DOCTYPE html>
+<html>
+  <head>
+    <script src="p5.min.js"></script>
+    <script src="ball.js"></script>
+    <script src="variable.js"></script>
+    <script src="sketch.js"></script>
+    <style> body {padding: 0; margin: 0;} </style>
+  </head>
+  <body>
+    <p>click mouse to create obstacles. each obstacle requires 2 clicks, each click makes a diagonal corner of the obstacle.</p>
+  </body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pathfinding Agent Simulation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f7f7f7; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        canvas { border: 2px solid #333; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 8px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800">Monte Carlo Pathfinding Agent</h1>
+    <div id="canvas-container"></div>
+    <div id="stats" class="mt-4 text-center p-3 bg-white shadow rounded-lg w-full max-w-lg">
+        <p class="text-sm text-gray-600">The agent learns by running episodes. Green path shows the current run. Blue path shows the best-ever run.</p>
+        <div class="flex justify-around mt-2">
+            <span id="episodes" class="font-medium text-indigo-600">Episodes: 0</span>
+            <span id="best-score" class="font-medium text-teal-600">Best Distance: N/A</span>
+            <span id="budget" class="font-medium text-teal-600">Budget: N/A</span>
+            <span id="wisdom" class="font-medium text-teal-600">Wisdom: N/A</span>
+
+        </div>
+    </div>
+</div>
+<script>
+// --- GLOBAL CONSTANTS & SETUP ---
+
+const WIDTH = 600;
+const HEIGHT = 400;
+const ORIGIN = { x: 20, y: 300 };
+const TARGET = { x: 600, y:250 };
+const BUDGET = 150; // Max steps per episode
+const AGENT_SIZE = 5;
+const STEP_SIZE = 10; // All movement steps are 5 units
+const DISCOUNT_FACTOR = 0.9;
+// All possible actions (dx, dy)
+const ACTIONS = [
+    [STEP_SIZE, 0],       // right
+    [-STEP_SIZE, 0],      // left
+    [0, STEP_SIZE],       // down
+    [0, -STEP_SIZE],      // up
+    [STEP_SIZE, STEP_SIZE],   // rightdown
+    [STEP_SIZE, -STEP_SIZE],  // rightup
+    [-STEP_SIZE, STEP_SIZE],  // leftdown
+    [-STEP_SIZE, -STEP_SIZE]  // leftup
+];
+
+let agent;
+let obstacles = [];
+let episodeCount = 0;
+let bestPath = [];
+let allPath = [];
+let bestScore = Infinity;
+
+/**
+ * Calculates the Euclidean distance between two points.
+ * @param {number} x1 
+ * @param {number} y1 
+ * @param {object} target 
+ * @returns {number}
+ */
+function calculateDistance(x1, y1, target) {
+    return Math.sqrt((x1 - target.x) ** 2 + (y1 - target.y) ** 2);
+}
+
+// --- CLASS DEFINITIONS ---
+
+class Obstacle {
+    constructor(x, y, w, h) {
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+    }
+
+    draw() {
+        fill(45, 55, 72); // Dark gray
+        noStroke();
+        rect(this.x, this.y, this.w, this.h);
+    }
+
+    /**
+     * Checks for collision between a point (x, y) and the obstacle.
+     * @param {number} px - Point X
+     * @param {number} py - Point Y
+     * @returns {boolean}
+     */
+    checkCollision(px, py) {
+        return (
+            px > this.x && 
+            px < this.x + this.w && 
+            py > this.y && 
+            py < this.y + this.h
+        );
+    }
+}
+
+class Agent {
+    constructor(x, y, width, height) {
+        this.origin = { x, y };
+        this.width = width;
+        this.height = height;
+        this.reset();
+        
+        // Maps "x,y" string to { num_visits: number, score: number (avg distance to target) }
+        this.wisdom = new Map(); 
+    }
+
+    reset() {
+        this.x = this.origin.x;
+        this.y = this.origin.y;
+        this.currentBudget = BUDGET;
+        this.alive = true;
+        this.memory = []; // Stores keys ("x,y") of positions visited in the current episode
+        this.currentDistance = calculateDistance(this.x, this.y, TARGET);
+    }
+
+    /**
+     * Selects the next best move based on exploration (num_visits) and exploitation (score).
+     * @param {Array<Object>} possibleMoves - Array of { key, x, y, utility }
+     * @returns {Object} The chosen move object
+     */
+    choose(possibleMoves) {
+        if (possibleMoves.length === 0) return null;
+
+        // 1. Find the minimum number of visits among all possible moves
+        let minVisits = Infinity;
+        for (const move of possibleMoves) {
+            minVisits = Math.min(minVisits, move.utility.num_visits);
+        }
+
+        // 2. Filter to moves with the minimum number of visits (Prioritize Exploration)
+        const candidates = possibleMoves.filter(move => move.utility.num_visits === minVisits);
+
+        // 3. Among candidates, choose the one with the lowest score (closest to target) (Exploitation)
+        let bestMove = candidates[0];
+        let minScore = candidates[0].utility.score;
+
+        for (const move of candidates) {
+            if (move.utility.score < minScore) {
+                minScore = move.utility.score;
+                bestMove = move;
+            }
+        }
+        
+        // A small amount of randomness to break ties if scores and visits are equal
+        if (Math.random() < 0.1) {
+            const randomIndex = floor(random(possibleMoves.length));
+            return possibleMoves[randomIndex];
+        } 
+        // else {
+        //     let bestMove = possibleMoves[0];
+        //     let minScore = possibleMoves[0].utility.score;
+
+        //     for (const move of possibleMoves) {
+        //         if (move.utility.score < minScore) {
+        //             minScore = move.utility.score;
+        //             bestMove = move;
+        //         }
+        //     }
+        //     return bestMove;
+        // }
+
+        return bestMove;
+    }
+
+    /**
+     * Determines the available moves and their current utility scores.
+     * @returns {Object} The chosen move, or null.
+     */
+    think() {
+        let possibleMoves = [];
+
+        for (const [dx, dy] of ACTIONS) {
+            const newX = this.x + dx;
+            const newY = this.y + dy;
+            const key = `${newX},${newY}`;
+
+            // 1. Check world boundaries
+            if (newX > 0 && newX < this.width && newY > 0 && newY < this.height) {
+                
+                // 2. Check for obstacle collision at the potential new position
+                if (!this.checkCollision(obstacles, newX, newY) && !this.memory.includes(key)) {
+                    
+                    // 3. Get or initialize utility data
+                    let utility;
+                    if (this.wisdom.has(key)) {
+                        utility = this.wisdom.get(key);
+                    } else {
+                        // Initialize utility: score is the distance to target (heuristic)
+                        utility = { 
+                            num_visits: 0, 
+                            // score: calculateDistance(newX, newY, TARGET) 
+                            score: 0
+                        };
+                        this.wisdom.set(key, utility);
+                    }
+
+                    possibleMoves.push({ key, x: newX, y: newY, utility });
+                }
+            }
+        }
+        return this.choose(possibleMoves);
+    }
+
+    act(move) {
+        if (!move) {
+            this.alive = false;
+            return;
+        }
+
+        // 1. Record the current position's key before moving
+        const currentKey = `${this.x},${this.y}`;
+        this.memory.push(currentKey);
+
+        // 2. Update position
+        this.x = move.x;
+        this.y = move.y;
+        this.currentBudget -= 1;
+        this.currentDistance = calculateDistance(this.x, this.y, TARGET);
+    }
+
+    /**
+     * Checks if the agent's current position is colliding with any obstacle or outside the world.
+     * @param {Array<Obstacle>} objs 
+     * @param {number} [px=this.x] - Optional check X position
+     * @param {number} [py=this.y] - Optional check Y position
+     * @returns {boolean} - true if collision occurred
+     */
+    checkCollision(objs, px = this.x, py = this.y) {
+        // Obstacle collision
+        for (const obj of objs) {
+            if (obj.checkCollision(px, py)) {
+                return true;
+            }
+        }
+        
+        // Boundary collision (using AGENT_SIZE as a simple radius/buffer)
+        const radius = AGENT_SIZE / 2;
+        if (px - radius < 0 || px + radius > this.width || 
+            py - radius < 0 || py + radius > this.height) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Updates the utility scores of all visited states in the episode (memory).
+     */
+    reflect() {
+    // The final episode score is the terminal distance/cost
+    const terminalCost = calculateDistance(this.x, this.y, TARGET);
+
+    // Update best path if this path was better than the previous best
+    if (terminalCost < bestScore) {
+        bestScore = terminalCost;
+        // IMPORTANT: Assumes this.memory now stores objects {key: string, cost: number}
+        bestPath = this.memory.map(m => m.key).concat(`${this.x},${this.y}`); 
+    }
+
+    // --- Core Back-Propagation Logic ---
+    let discountedReturn = terminalCost; // G_t starts with the final terminal cost (R_T)
+
+    // 1. Iterate backward through the episode history (from last state to first)
+    for (let i = this.memory.length - 1; i >= 0; i--) {
+        const step = this.memory[i]; // step = { key: "x,y", cost: instantaneous_cost }
+        const stateKey = step.key;
+        
+        // 2. Calculate the discounted return G_t
+        // G_t = R_t + gamma * G_{t+1}
+        // We use step.cost for the instantaneous R_t and the existing discountedReturn for gamma * G_{t+1}
+        discountedReturn = step.cost + DISCOUNT_FACTOR * discountedReturn;
+
+        // 3. First-Visit Check: Only update states the first time they were visited in this episode
+        // (A more efficient implementation would use a Set, but this is explicit)
+        let isFirstVisit = true;
+        for (let j = 0; j < i; j++) {
+            if (this.memory[j].key === stateKey) {
+                isFirstVisit = false;
+                break;
+            }
+        }
+
+        if (isFirstVisit) {
+            if (this.wisdom.has(stateKey)) {
+                const utility = this.wisdom.get(stateKey);
+                
+                // 4. Update running average (Incremental Mean)
+                const newVisits = utility.num_visits + 1;
+                // Update average cost/return using the new discountedReturn
+                const newScore = (utility.score * utility.num_visits + discountedReturn) / newVisits;
+                
+                // Update utility
+                utility.score = newScore;
+                utility.num_visits = newVisits;
+                this.wisdom.set(stateKey, utility);
+            } else {
+                 // Initialize wisdom if the state is new
+                 this.wisdom.set(stateKey, { score: discountedReturn, num_visits: 1 });
+            }
+        }
+    }
+
+    // --- Existing Cleanup ---
+    episodeCount++;
+    this.updateStats();
+    allPath.push(this.memory.map(m => m.key)); // Store only keys for path history
+    this.reset();
+}
+    // reflect() {
+    //     // The final episode score is the distance to the target at the end
+    //     const episodeScore = calculateDistance(this.x, this.y, TARGET);
+
+    //     // Update best path if this path was better than the previous best
+    //     if (episodeScore < bestScore) {
+    //         bestScore = episodeScore;
+    //         bestPath = [...this.memory, `${this.x},${this.y}`]; // Include final position
+    //     }
+
+    //     // Apply score update (Monte Carlo style) to every position in the path
+    //     for (const key of this.memory) {
+    //         if (this.wisdom.has(key)) {
+    //             const utility = this.wisdom.get(key);
+                
+    //             // Calculate the new running average (mean distance)
+    //             const newVisits = utility.num_visits + 1;
+    //             const newScore = (utility.score * utility.num_visits + episodeScore) / newVisits;
+                
+    //             // Update utility
+    //             utility.score = newScore;
+    //             utility.num_visits = newVisits;
+    //             this.wisdom.set(key, utility);
+    //         }
+    //     }
+    //     // let gamma = 0.9;
+    //     // let key = this.memory[this.memory.length-1];
+    //     // let utility; let newVisits; let newScore
+    //     // if (this.wisdom.has(key)) {
+    //     //     utility = this.wisdom.get(key);
+    //     //     newVisits = utility.num_visits + 1;
+    //     //     newScore = gamma* (utility.score * utility.num_visits + episodeScore) / newVisits;
+                
+    //     //     // Update utility
+    //     //     utility.score = newScore;
+    //     //     utility.num_visits = newVisits;
+    //     //     this.wisdom.set(key, utility);
+    //     // }
+    //     // for (let i=this.memory.length-2; i>=0;i--) {
+    //     //     key = this.memory[i];
+    //     //     if (this.wisdom.has(key)) {
+    //     //         utility = this.wisdom.get(key);
+                
+    //     //         // Calculate the new running average (mean distance)
+    //     //         newVisits = utility.num_visits + 1;
+    //     //         newScore = gamma* (utility.score * utility.num_visits + newScore) / newVisits;
+                
+    //     //         // Update utility
+    //     //         utility.score = newScore;
+    //     //         utility.num_visits = newVisits;
+    //     //         this.wisdom.set(key, utility);
+    //     //     }
+    //     // }
+
+    //     episodeCount++;
+    //     this.updateStats();
+    //     allPath.push(this.memory);
+    //     this.reset();
+    // }
+
+    updateStats() {
+        document.getElementById('episodes').innerText = `Episodes: ${episodeCount}`;
+        document.getElementById('best-score').innerText = `Best Distance: ${bestScore.toFixed(2)}`;
+        document.getElementById('wisdom').innerText = `Wisdom size: ${this.wisdom.size}`;
+    }
+
+    live(objs) {
+        if (!this.alive) {
+            // Check if agent reached the target area (e.g., within 10 units)
+            if (this.currentDistance < 10) {
+                // If target reached, use 0 as the episode score
+                this.x = TARGET.x; // Snap to target for clean score
+                this.y = TARGET.y;
+            }
+            this.reflect();
+            return;
+        }
+        
+        // If agent is alive, take a step
+        let move = this.think();
+        this.act(move);
+        document.getElementById('budget').innerText = `Budget: ${this.currentBudget}`;
+        // Check for end conditions: out of budget or collision
+        if (this.currentBudget <= 0 || this.checkCollision(objs) || this.currentDistance < 10) {
+            this.alive = false;
+        }
+    }
+
+    draw() {
+        // Draw path taken in this episode
+        for (const mem of allPath){
+            this.drawPath(mem, color(0, 150, 0, 100));
+        }
+        // this.drawPath(this.memory, color(0, 150, 0, 100)); // Green for current path
+
+        // Draw the best recorded path
+        this.drawPath(bestPath, color(0, 100, 255, 200), 1.5); // Blue for best path
+
+        // Draw the agent
+        stroke(255);
+        fill(255, 69, 0); // Orange
+        ellipse(this.x, this.y, AGENT_SIZE * 2);
+
+        // Draw the target
+        fill(255, 255, 0, 150); // Yellow/Gold
+        noStroke();
+        ellipse(TARGET.x, TARGET.y, 20);
+        fill(0);
+        textAlign(CENTER, CENTER);
+        textSize(10);
+        text('Target', TARGET.x, TARGET.y);
+    }
+
+    drawPath(pathKeys, pathColor, weight = 1) {
+        if (pathKeys.length < 2) return;
+        
+        stroke(pathColor);
+        strokeWeight(weight);
+        noFill();
+        beginShape();
+        
+        for (const key of pathKeys) {
+            const [x, y] = key.split(',').map(Number);
+            vertex(x, y);
+        }
+        endShape();
+    }
+}
+
+
+// --- P5.JS FUNCTIONS ---
+
+function setup() {
+    const canvas = createCanvas(WIDTH, HEIGHT);
+    canvas.parent('canvas-container');
+    
+    // Create Obstacles
+    obstacles.push(new Obstacle(200, 150, 40, 150));
+    obstacles.push(new Obstacle(400, 50, 30, 150));
+    obstacles.push(new Obstacle(500, 200, 40, 200));
+    // obstacles.push(new Obstacle(600, 300, 100, 30)); // Adjusted X for visibility
+
+    // Create Agent
+    agent = new Agent(ORIGIN.x, ORIGIN.y, WIDTH, HEIGHT);
+    
+    // Initialize stats
+    agent.updateStats();
+    
+    // Set frame rate to speed up simulation for learning
+    frameRate(60); 
+}
+
+function draw() {
+    background(240); // Light background
+
+    // Draw grid/start
+    stroke(0, 255, 0, 50);
+    fill(0, 255, 0, 50);
+    ellipse(ORIGIN.x, ORIGIN.y, 10);
+    
+    // Draw obstacles
+    for (const obj of obstacles) {
+        obj.draw();
+    }
+
+    // Agent's lifecycle runs every frame
+    agent.live(obstacles);
+    
+    // Draw everything
+    agent.draw();
+}
+</script>
+</body>
+</html>

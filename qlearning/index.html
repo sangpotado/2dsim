@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Learning Pathfinding Agent</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { margin: 0; overflow-y: auto; background-color: #f7f7f7; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; font-family: 'Inter', sans-serif; }
+        .container { display: flex; flex-direction: column; align-items: center; padding: 20px; max-width: 640px; width: 100%; }
+        canvas { border: 2px solid #333; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 8px; cursor: crosshair; }
+        .slider-group { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+        .slider-group label { font-weight: 500; font-size: 0.9rem; color: #374151; width: 40%; }
+        .slider-group output { font-weight: 700; color: #4338ca; width: 15%; text-align: right; }
+        .slider-group input { width: 45%; }
+        /* Toggle Button Styles */
+        .toggle-btn[data-active="true"] {
+            background-color: #10b981; /* Tailwind green-600 */
+            color: white;
+        }
+        .toggle-btn[data-active="false"] {
+            background-color: #ef4444; /* Tailwind red-500 */
+            color: white;
+        }
+    </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800">Q-Learning Agent (Off-Policy TD)</h1>
+    <div id="canvas-container"></div>
+    
+    <!-- CONTROL PANEL UPDATED HERE -->
+    <div id="controls" class="mt-4 p-4 bg-gray-50 shadow-xl rounded-lg w-full max-w-lg space-y-2">
+        <h2 class="text-xl font-extrabold text-indigo-700 border-b-2 border-indigo-200 pb-2 mb-3">Hyperparameters</h2>
+
+        <!-- LEARNING_RATE -->
+        <div class="slider-group">
+            <label for="learningRate">Learning Rate (α)</label>
+            <input type="range" id="learningRate" min="0.01" max="1" step="0.01" value="0.2">
+            <output id="learningRate-value">0.200</output>
+        </div>
+
+        <!-- DISCOUNT_FACTOR -->
+        <div class="slider-group">
+            <label for="discountFactor">Discount Factor (γ)</label>
+            <input type="range" id="discountFactor" min="0.01" max="0.999" step="0.001" value="0.99">
+            <output id="discountFactor-value">0.990</output>
+        </div>
+
+        <!-- EPSILON -->
+        <div class="slider-group">
+            <label for="epsilon">Exploration Rate (ε)</label>
+            <input type="range" id="epsilon" min="0.01" max="1" step="0.01" value="0.4">
+            <output id="epsilon-value">0.400</output>
+        </div>
+
+        <!-- EPSILON_DECAY -->
+        <div class="slider-group">
+            <label for="epsilonDecay">Decay Rate</label>
+            <input type="range" id="epsilonDecay" min="0.95" max="0.9999" step="0.0001" value="0.99">
+            <output id="epsilonDecay-value">0.9900</output>
+        </div>
+        
+        <!-- MIN_EPSILON -->
+        <div class="slider-group">
+            <label for="minEpsilon">Min Epsilon</label>
+            <input type="range" id="minEpsilon" min="0.001" max="0.5" step="0.001" value="0.05">
+            <output id="minEpsilon-value">0.050</output>
+        </div>
+        
+        <!-- BUDGET -->
+        <div class="slider-group">
+            <label for="budget">Episode Budget (Steps)</label>
+            <input type="range" id="budget" min="10" max="500" step="1" value="15">
+            <output id="budget-value">15</output>
+        </div>
+
+        <!-- NEW: Toggle Buttons for Environment -->
+        <div class="flex justify-between space-x-4 pt-4 border-t mt-3 border-gray-200">
+            <button id="toggle-obstacles" class="toggle-btn w-1/2 p-2 rounded-lg font-bold transition duration-300" data-active="false">
+                Obstacles: OFF
+            </button>
+            <button id="toggle-nuggets" class="toggle-btn w-1/2 p-2 rounded-lg font-bold transition duration-300" data-active="false">
+                Nuggets: OFF (Click to Add)
+            </button>
+        </div>
+        
+    </div>
+    <!-- END CONTROL PANEL -->
+
+<div id="stats" class="mt-4 text-center p-3 bg-white shadow rounded-lg w-full max-w-lg">
+    <p class="text-sm text-gray-600">Progress of QLearning and MonteCarlo agents</p>
+    <div class="flex flex-wrap justify-around mt-2">
+        <span id="episodes" class="font-medium text-indigo-600 w-1/2">Episodes: 0</span>
+        <span id="q-status" class="font-medium text-purple-600 w-1/2">Q-Table Size: 0</span>
+        <span id="MC-size" class="font-medium text-purple-600 w-1/2">MC Size: 0</span>
+        <span id="best-score" class="font-medium text-purple-600 w-1/2">MC best score: 0.00</span>
+    </div>
+    <!-- Section for mouse-hover values -->
+    <div class="mt-3 pt-3 border-t border-gray-200 text-sm">
+        <span class="font-semibold text-gray-700">Value at Mouse: </span>
+        <span id='max-qvalue' class="font-bold text-blue-600">Q: 0.00</span>
+        <span class="mx-2 text-gray-400">|</span>
+        <span id='mc-score-at-mouse' class="font-bold text-emerald-600">MC Score: 0.00</span>
+    </div>
+</div>
+    <script src="agent.js"></script> <!--Nugget Class, Obstacle Class, Agent class-->
+    <script src="control.js"></script> <!--Contains all functions related to the UI: updateParameter, toggleObstacles, toggleNuggets, and all window.onload event listeners.-->
+    <script src="sketch.js"></script>  <!-- p5 sketch (setup and draw loops), defines global constants, and orchestrates the environment setup. -->
+</body>
